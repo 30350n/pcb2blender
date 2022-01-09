@@ -1,0 +1,3 @@
+[submodule "pcb2blender_importer/mat4cad"]
+	path = pcb2blender_importer/mat4cad
+	url = https://github.com/30350n/mat4cad.git
