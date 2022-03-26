@@ -14,7 +14,7 @@ def merge_materials(meshes):
 
 def enhance_materials(materials):
     for material in materials:
-        if mat4cad_mat := MATERIALS.get(material.name):
+        if mat4cad_mat := Material.from_name(material.name):
             mat4cad_mat.setup_node_tree(material.node_tree)
 
 def is_same_color(a, b):
