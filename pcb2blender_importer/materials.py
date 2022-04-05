@@ -21,14 +21,14 @@ def is_same_color(a, b):
     return (Vector(a[:3]) - Vector(b[:3])).magnitude < 0.01
 
 PCB2_LAYER_NAMES = (
-    "0 Board",
-    "1 Front Copper",
-    "2 Front Paste",
-    "3 Front Solder Mask",
-    "4 Back Copper",
-    "5 Back Paste",
-    "6 Back Solder Mask",
-    "7 Through Holes",
-    "8 Front Silkscreen",
-    "9 Back Silkscreen",
+    "Board",
+    "F.Cu",
+    "F.Paste",
+    "F.Mask",
+    "B.Cu",
+    "B.Paste",
+    "B.Mask",
+    "Vias",
+    "F.Silk",
+    "B.Silk",
 )
