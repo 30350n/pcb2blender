@@ -166,8 +166,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 self.extrude_mesh_z(mask.data, 0.5 * direction)
 
                 copper_cutter = self.copy_object(tracks, context.collection)
-                bm = bmesh.new()
-                bm.from_mesh(copper_cutter.data)
 
                 bpy.ops.object.select_all(action="DESELECT")
                 copper_cutter.select_set(True)
@@ -184,25 +182,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 bpy.ops.mesh.remove_doubles(threshold=0.015)
                 bpy.ops.object.mode_set(mode="OBJECT")
                 bpy.ops.object.select_all(action="DESELECT")
-
-                """bm.normal_update()
-                bmesh.ops.delete(bm,
-                    geom=[v for v in bm.verts[:] if v.normal.dot((0, 0, direction)) < 0.99])
-
-                bm.to_mesh(copper_cutter.data)
-                cock
-
-                bmesh.ops.remove_doubles(bm, dist=0.0001, verts=bm.verts[:])
-                #bmesh.ops.intersect
-                bmesh.ops.beautify_fill(bm, faces=bm.faces[:], edges=bm.edges[:])
-                bmesh.ops.inset_region(bm, use_boundary=True, faces=bm.faces[:],
-                    thickness=0.015, depth=0.1)
-                bmesh.ops.remove_doubles(bm, dist=0.015, verts=bm.verts[:])
-                bmesh.ops.dissolve_limit(bm, verts=bm.verts[:], edges=bm.edges[:],
-                    angle_limit=math.radians(5))
-
-                bm.to_mesh(copper_cutter.data)
-                bm.free()"""
 
                 self.cut_object(context, mask, copper_cutter, "DIFFERENCE")
 
