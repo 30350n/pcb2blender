@@ -26,12 +26,14 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     bl_label = "Import .pcb3d"
 
     import_components: BoolProperty(name="Import Components", default=True)
-    cut_boards:        BoolProperty(name="Cut Boards", default=True)
-    stack_boards:      BoolProperty(name="Stack Boards", default=True)
-    center_pcbs:       BoolProperty(name="Center PCBs", default=True)
+    center_pcb:        BoolProperty(name="Center PCB", default=True)
+    enhance_pcb:       BoolProperty(name="Enhance PCB", default=True)
 
     merge_materials:   BoolProperty(name="Merge Materials", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
+
+    cut_boards:        BoolProperty(name="Cut PCBs", default=True)
+    stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
     import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
@@ -126,122 +128,113 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         pcb_objects = self.import_wrl(context, tempdir / PCB, join=False)
 
-        if len(pcb_objects) == len(PCB2_LAYER_NAMES):
+        # enhance pcb
+
+        can_enhance = len(pcb_objects) == len(PCB2_LAYER_NAMES)
+        if can_enhance:
             layers = dict(zip(PCB2_LAYER_NAMES, pcb_objects))
             for name, obj in layers.items():
-                obj.name = name
                 obj.data.materials[0].name = name
+        else:
+            print(f"warning: cannot enhance pcb"\
+                f"(imported {len(pcb_objects)} layers, expected {len(PCB2_LAYER_NAMES)})")
 
-            bpy.data.objects.remove(layers["PASTE_FRONT"])
-            bpy.data.objects.remove(layers["PASTE_BACK"])
+        if can_enhance and self.enhance_pcb:
+            for side, direction in reversed(list(zip(("F", "B"), (1, -1)))):
+                mask = layers[f"{side}.Mask"]
+                copper = layers[f"{side}.Cu"]
+                silk = layers[f"{side}.Silk"]
+                paste = layers[f"{side}.Paste"]
 
-            mask_front = layers["MASK_FRONT"]
-            mask_front_cutter = mask_front.copy()
-            mask_front_cutter.data = mask_front.data.copy()
-            context.collection.objects.link(mask_front_cutter)
+                pcb_objects.remove(paste)
+                bpy.data.objects.remove(paste)
 
-            copper_front = layers["COPPER_FRONT"]
-            copper_front_cutter = copper_front.copy()
-            copper_front_cutter.data = copper_front.data.copy()
-            context.collection.objects.link(copper_front_cutter)
-            copper_pads_front = copper_front.copy()
-            copper_pads_front.data = copper_front.data.copy()
-            context.collection.objects.link(copper_pads_front)
+                # split copper layer into tracks and pads
 
-            bm = bmesh.new()
-            bm.from_mesh(mask_front_cutter.data)
-            result = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
-            extruded = [v for v in result["geom"] if isinstance(v, bmesh.types.BMVert)]
-            bmesh.ops.translate(bm, vec=(0, 0, 0.5), verts=extruded)
-            bmesh.ops.translate(bm, vec=(0, 0, -0.25), verts=bm.verts[:])
-            bm.to_mesh(mask_front_cutter.data)
+                tracks = copper
+                pads = self.copy_object(copper, context.collection)
+                pcb_objects.append(pads)
 
-            modifier = copper_front.modifiers.new("Boolean", "BOOLEAN")
-            modifier.operation = "INTERSECT"
-            modifier.object = mask_front_cutter
-            modifier = copper_pads_front.modifiers.new("Boolean", "BOOLEAN")
-            modifier.operation = "DIFFERENCE"
-            modifier.object = mask_front_cutter
+                mask_cutter = self.copy_object(mask, context.collection)
+                self.extrude_mesh_z(mask_cutter.data, 0.25, True)
+                self.cut_object(context, tracks, mask_cutter, "INTERSECT")
+                self.cut_object(context, pads, mask_cutter, "DIFFERENCE")
+                bpy.data.objects.remove(mask_cutter)
 
-            bpy.ops.object.select_all(action="DESELECT")
-            context.view_layer.objects.active = copper_front
-            bpy.ops.object.modifier_apply(modifier="Boolean")
-            context.view_layer.objects.active = copper_pads_front
-            bpy.ops.object.modifier_apply(modifier="Boolean")
+                # add 3d tracks to mask layer
 
-            bpy.data.objects.remove(mask_front_cutter)
+                self.extrude_mesh_z(mask.data, 0.5 * direction)
 
-            copper_pads_front_cutter = copper_pads_front.copy()
-            copper_pads_front_cutter.data = copper_pads_front.data.copy()
-            context.collection.objects.link(copper_pads_front_cutter)
-
-            bm = bmesh.new()
-            bm.from_mesh(mask_front.data)
-            result = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
-            extruded = [v for v in result["geom"] if isinstance(v, bmesh.types.BMVert)]
-            bmesh.ops.translate(bm, vec=(0, 0, 0.5), verts=extruded)
-            bm.to_mesh(mask_front.data)
-
-            mesh = copper_front_cutter.data
-            bm = bmesh.new()
-            bm.from_mesh(mesh)
-            bmesh.ops.remove_doubles(bm, dist=0.0001, verts=bm.verts[:])
-            bmesh.ops.beautify_fill(bm, faces=bm.faces[:], edges=bm.edges[:])
-            bmesh.ops.inset_region(bm, faces=bm.faces[:], thickness=0.015, depth=0.008, use_boundary=True)
-            bmesh.ops.remove_doubles(bm, dist=0.015, verts=bm.verts[:])
-            bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(5), verts=bm.verts[:], edges=bm.edges[:])
-            bm.to_mesh(mesh)
-
-            modifier = mask_front.modifiers.new("Boolean", "BOOLEAN")
-            modifier.operation = "DIFFERENCE"
-            modifier.object = copper_front_cutter
-
-            context.view_layer.objects.active = mask_front
-            bpy.ops.object.modifier_apply(modifier="Boolean")
-
-            bpy.data.objects.remove(copper_front_cutter)
-
-            bm = bmesh.new()
-            bm.from_mesh(mask_front.data)
-            bmesh.ops.delete(bm, geom=[v for v in bm.verts[:] if abs(v.co.z) > 0.8])
-            bmesh.ops.translate(bm, vec=(0, 0, -0.008), verts=bm.verts[:])
-            bm.to_mesh(mask_front.data)
-
-            silk_front = layers["SILK_FRONT"]
-            silk_front.visible_shadow = False
-            bm = bmesh.new()
-            bm.from_mesh(silk_front.data)
-            bmesh.ops.translate(bm, vec=(0, 0, -0.028), verts=bm.verts[:])
-            bm.to_mesh(silk_front.data)
-
-            for layer_obj in (copper_front, copper_pads_front):
+                copper_cutter = self.copy_object(tracks, context.collection)
                 bm = bmesh.new()
-                bm.from_mesh(layer_obj.data)
-                bmesh.ops.translate(bm, vec=(0, 0, -0.004), verts=bm.verts[:])
-                bm.to_mesh(layer_obj.data)
+                bm.from_mesh(copper_cutter.data)
 
-            vias = layers["VIAS"]
-            bm = bmesh.new()
-            bm.from_mesh(vias.data)
-            bmesh.ops.scale(bm, vec=(1, 1, 0.97), verts=bm.verts[:])
-            bm.to_mesh(vias.data)
+                bpy.ops.object.select_all(action="DESELECT")
+                copper_cutter.select_set(True)
+                context.view_layer.objects.active = copper_cutter
 
-            bm = bmesh.new()
-            bm.from_mesh(copper_pads_front_cutter.data)
-            result = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
-            extruded = [v for v in result["geom"] if isinstance(v, bmesh.types.BMVert)]
-            bmesh.ops.translate(bm, vec=(0, 0, 0.5), verts=extruded)
-            bmesh.ops.translate(bm, vec=(0, 0, -0.25), verts=bm.verts[:])
-            bm.to_mesh(copper_pads_front_cutter.data)
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.mesh.remove_doubles()
+                bpy.ops.mesh.intersect_boolean(operation="UNION", use_self=True)
+                bpy.ops.mesh.select_all(action="SELECT")
+                bpy.ops.mesh.dissolve_limited(angle_limit=math.radians(5))
+                bpy.ops.mesh.quads_convert_to_tris()
+                bpy.ops.mesh.beautify_fill()
+                bpy.ops.mesh.inset(thickness=0.015, depth=0.008)
+                bpy.ops.mesh.remove_doubles(threshold=0.015)
+                bpy.ops.object.mode_set(mode="OBJECT")
+                bpy.ops.object.select_all(action="DESELECT")
 
-            modifier = silk_front.modifiers.new("Boolean", "BOOLEAN")
-            modifier.operation = "DIFFERENCE"
-            modifier.object = copper_pads_front_cutter
+                """bm.normal_update()
+                bmesh.ops.delete(bm,
+                    geom=[v for v in bm.verts[:] if v.normal.dot((0, 0, direction)) < 0.99])
 
-            context.view_layer.objects.active = silk_front
-            bpy.ops.object.modifier_apply(modifier="Boolean")
+                bm.to_mesh(copper_cutter.data)
+                cock
 
-            bpy.data.objects.remove(copper_pads_front_cutter)
+                bmesh.ops.remove_doubles(bm, dist=0.0001, verts=bm.verts[:])
+                #bmesh.ops.intersect
+                bmesh.ops.beautify_fill(bm, faces=bm.faces[:], edges=bm.edges[:])
+                bmesh.ops.inset_region(bm, use_boundary=True, faces=bm.faces[:],
+                    thickness=0.015, depth=0.1)
+                bmesh.ops.remove_doubles(bm, dist=0.015, verts=bm.verts[:])
+                bmesh.ops.dissolve_limit(bm, verts=bm.verts[:], edges=bm.edges[:],
+                    angle_limit=math.radians(5))
+
+                bm.to_mesh(copper_cutter.data)
+                bm.free()"""
+
+                self.cut_object(context, mask, copper_cutter, "DIFFERENCE")
+
+                bpy.data.objects.remove(copper_cutter)
+
+                bm = bmesh.new()
+                bm.from_mesh(mask.data)
+                bmesh.ops.delete(bm, geom=[v for v in bm.verts[:] if abs(v.co.z) > 0.8])
+                bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+                bm.to_mesh(mask.data)
+                bm.free()
+
+                # remove silkscreen on pads
+
+                pads_cutter = self.copy_object(pads, context.collection)
+                self.extrude_mesh_z(pads_cutter.data, 0.25, True)
+                self.cut_object(context, silk, pads_cutter, "DIFFERENCE")
+                bpy.data.objects.remove(pads_cutter)
+
+                silk.visible_shadow = False
+
+                # align the layers
+
+                self.translate_mesh_z(mask.data, -0.008 * direction)
+                self.translate_mesh_z(silk.data, -0.028 * direction)
+                self.translate_mesh_z(tracks.data, -0.004 * direction)
+                self.translate_mesh_z(pads.data, -0.004 * direction)
+
+            # scale down vias to match the other layers
+            vias = layers["Vias"]
+            vias.data.transform(Matrix.Diagonal((1, 1, 0.97, 1)))
+            vias.data.polygons.foreach_set("use_smooth", [True] * len(vias.data.polygons))
 
         pcb_object = pcb_objects[0]
         bpy.ops.object.select_all(action="DESELECT")
@@ -363,7 +356,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             for (_, stacked_boards, board_obj) in boards.values():
                 for (name, offset) in stacked_boards:
                     if not name in boards:
-                        self.warning("ignoring stacked board \"{name}\" (unknown board)")
+                        self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
                         continue
 
                     stacked_obj = boards[name][2]
@@ -385,7 +378,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # center pcbs
 
-        if self.center_pcbs:
+        if self.center_pcb:
             if boards:
                 center = Vector((0, 0))
                 for ((pos1, pos2), _, _) in top_level_boards:
@@ -408,7 +401,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         return {"FINISHED"}
 
-    def import_wrl(self, context, filepath, join=True):
+    @staticmethod
+    def import_wrl(context, filepath, join=True):
         objects_before = set(bpy.data.objects)
         bpy.ops.import_scene.x3d(filepath=str(filepath), axis_forward="Y", axis_up="Z")
         wrl_objects = set(bpy.data.objects).difference(objects_before)
@@ -429,7 +423,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         return joined_obj
 
-    def get_boundingbox(self, context, bounds):
+    @staticmethod
+    def get_boundingbox(context, bounds):
         name = "pcb2blender_bounds_tmp"
         mesh = bpy.data.meshes.new(name)
         obj = bpy.data.objects.new(name, mesh)
@@ -450,19 +445,61 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         bm.free()
 
         return obj
-    
+
+    @staticmethod
+    def copy_object(obj, collection):
+        new_obj = obj.copy()
+        new_obj.data = obj.data.copy()
+        collection.objects.link(new_obj)
+        return new_obj
+
+    @staticmethod
+    def cut_object(context, obj, cutter, mode):
+        mod_name = "Cut Object"
+        modifier = obj.modifiers.new(mod_name, type="BOOLEAN")
+        modifier.operation = mode
+        modifier.object = cutter
+        context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=mod_name)
+
+    @staticmethod
+    def extrude_mesh_z(mesh, z, symmetric=False):
+        vec = Vector((0, 0, z))
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+
+        result = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
+        extruded_verts = [v for v in result["geom"] if isinstance(v, bmesh.types.BMVert)]
+        if symmetric:
+            bmesh.ops.translate(bm, vec=vec * 2, verts=extruded_verts)
+            bmesh.ops.translate(bm, vec=-vec, verts=bm.verts[:])
+        else:
+            bmesh.ops.translate(bm, vec=vec, verts=extruded_verts)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+
+        bm.to_mesh(mesh)
+        bm.free()
+
+    @staticmethod
+    def translate_mesh_z(mesh, z):
+        mesh.transform(Matrix.Translation((0, 0, z)))
+
     def draw(self, context):
         layout = self.layout
 
         layout.prop(self, "import_components")
-        layout.prop(self, "cut_boards")
-        layout.prop(self, "stack_boards")
-        layout.prop(self, "center_pcbs")
+        layout.prop(self, "center_pcb")
+        layout.prop(self, "enhance_pcb")
 
         layout.split()
 
         layout.prop(self, "merge_materials")
         layout.prop(self, "enhance_materials")
+
+        layout.split()
+
+        layout.prop(self, "cut_boards")
+        layout.prop(self, "stack_boards")
 
         layout.split()
 
