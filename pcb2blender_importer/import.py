@@ -1,5 +1,5 @@
 import bpy, bmesh, addon_utils
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, orientation_helper, axis_conversion
 from bpy.props import *
 from mathutils import Vector, Matrix
 
@@ -9,6 +9,9 @@ from zipfile import ZipFile, BadZipFile, Path as ZipPath
 import numpy as np
 
 from .materials import *
+
+from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
+from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -21,9 +24,10 @@ REQUIRED_MEMBERS = {PCB}
 PCB_THICKNESS = 1.6 # mm
 
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
-    """Load a PCB file."""
+    """Import a PCB3D file"""
     bl_idname = "pcb2blender.import_pcb3d"
     bl_label = "Import .pcb3d"
+    bl_options = {"PRESET", "UNDO"}
 
     import_components: BoolProperty(name="Import Components", default=True)
     center_pcb:        BoolProperty(name="Center PCB", default=True)
@@ -469,20 +473,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layout.prop(self, "import_components")
         layout.prop(self, "center_pcb")
         layout.prop(self, "enhance_pcb")
-
         layout.split()
-
         layout.prop(self, "merge_materials")
         layout.prop(self, "enhance_materials")
-
         layout.split()
-
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
 
-        layout.split()
-
         if has_svg2blender():
+            layout.split()
             layout.prop(self, "import_fpnl")
             box = layout.box()
             box.enabled = self.import_fpnl
@@ -553,22 +552,108 @@ def match2matrix(match):
 
     return matrix
 
+@orientation_helper(axis_forward="X", axis_up="Z")
+class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
+    __doc__ = ImportX3D.__doc__
+    bl_idname = "pcb2blender.import_x3d"
+    bl_label = ImportX3D.bl_label
+    bl_options = {"PRESET", "UNDO"}
+
+    filename_ext = ".x3d"
+    filter_glob: StringProperty(default="*.x3d;*.wrl", options={"HIDDEN"})
+
+    join:              BoolProperty(name="Join Shapes", default=True)
+    tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
+    enhance_materials: BoolProperty(name="Enhance Materials", default=True)
+    scale:             FloatProperty(name="Scale", default=0.001)
+
+    def execute(self, context):
+        bpy.ops.object.select_all(action='DESELECT')
+
+        objects_before = set(bpy.data.objects)
+        matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
+        result = import_x3d.load(context, self.filepath, global_matrix=matrix)
+        if not result == {"FINISHED"}:
+            return result
+        objects = list(set(bpy.data.objects).difference(objects_before))
+
+        for obj in objects:
+            obj.scale = Vector((1, 1, 1)) * self.scale
+            obj.select_set(True)
+        context.view_layer.objects.active = objects[0]
+
+        if self.join:
+            bpy.ops.object.join()
+            joined_obj = context.object
+            joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
+            joined_obj.data.name = joined_obj.name
+            objects = [joined_obj]
+
+        if self.tris_to_quads:
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.tris_convert_to_quads()
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+        if self.enhance_materials:
+            bpy.ops.object.shade_smooth()
+
+            merge_materials([obj.data for obj in objects])
+            enhance_materials(sum((obj.data.materials[:] for obj in objects), []))
+
+        return {"FINISHED"}
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        layout.prop(self, "join")
+        layout.prop(self, "tris_to_quads")
+        layout.prop(self, "enhance_materials")
+        layout.split()
+        layout.prop(self, "scale")
+
+bases = X3D_PT_import_transform.__bases__
+namespace = dict(X3D_PT_import_transform.__dict__)
+del namespace["bl_rna"]
+X3D_PT_import_transform_copy = type("X3D_PT_import_transform_copy", bases, namespace)
+class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
+
 def has_svg2blender():
     return addon_utils.check("svg2blender-importer") == (True, True)
 
 def menu_func_import_pcb3d(self, context):
     self.layout.operator(PCB2BLENDER_OT_import_pcb3d.bl_idname, text="PCB (.pcb3d)")
 
-operators = (PCB2BLENDER_OT_import_pcb3d,)
+def menu_func_import_x3d(self, context):
+    self.layout.operator(PCB2BLENDER_OT_import_x3d.bl_idname,
+        text="X3D Extensible 3D (.x3d/.wrl)")
+
+classes = (
+    PCB2BLENDER_OT_import_pcb3d,
+    PCB2BLENDER_OT_import_x3d,
+    PCB2BLENDER_PT_import_transform_x3d,
+)
 
 def register():
-    for operator in operators:
-        bpy.utils.register_class(operator)
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_x3d_original)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import_x3d)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import_pcb3d)
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_pcb3d)
 
-    for operator in reversed(operators):
-        bpy.utils.unregister_class(operator)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_x3d)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import_x3d_original)
+
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
