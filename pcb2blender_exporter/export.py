@@ -83,22 +83,20 @@ def get_boarddefs(board):
     for drawing in board.GetDrawings():
         if drawing.Type() == pcbnew.PCB_TEXT_T:
             text_obj = drawing.Cast()
-            pos = text_obj.GetPosition()
-            pos = (pos.x / 1000000.0, pos.y / 1000000.0)
-
             text = text_obj.GetText()
-            add_to = None
+
+            if not text.startswith("PCB3D_"):
+                continue
+
+            pos = tuple(map(ToMM, text_obj.GetPosition()))
             if text.startswith("PCB3D_TL_"):
-                add_to = tls
+                tls.setdefault(text, pos)
             elif text.startswith("PCB3D_BR_"):
-                add_to = brs
+                brs.setdefault(text, pos)
             elif text.startswith("PCB3D_STACK_"):
-                add_to = stacks
-            if text.startswith("PCB3D_"):
-                if add_to != None and not text in add_to:
-                    add_to[text] = pos
-                else:
-                    ignored.append(text)
+                stacks.setdefault(text, pos)
+            else:
+                ignored.append(text)
 
     for tl_str in tls.copy():
         name = tl_str[9:]
