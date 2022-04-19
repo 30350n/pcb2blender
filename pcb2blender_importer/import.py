@@ -15,9 +15,14 @@ from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
+LAYERS = "layers"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
+
+INCLUDED_LAYERS = (
+    "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
+)
 
 REQUIRED_MEMBERS = {PCB}
 
@@ -66,65 +71,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         tempdir = Path(tempfile.gettempdir()) / "pcb2blender_tmp" / dirname
         tempdir.mkdir(parents=True, exist_ok=True)
 
-        # parse file
-
         try:
             with ZipFile(filepath) as file:
-                zip_path = ZipPath(file)
-                MEMBERS = {path.name for path in zip_path.iterdir()}
+                MEMBERS = {path.name for path in ZipPath(file).iterdir()}
                 if missing := REQUIRED_MEMBERS.difference(MEMBERS):
                     return self.error(f"not a valid .pcb3d file: missing {str(missing)[1:-1]}")
-
-                with file.open(PCB) as pcb_file:
-                    pcb_file_content = pcb_file.read().decode("UTF-8")
-                    with open(tempdir / PCB, "wb") as filtered_file:
-                        filtered = regex_filter_components.sub("\g<prefix>", pcb_file_content)
-                        filtered_file.write(filtered.encode("UTF-8"))
-
-                components = set(filter(
-                    lambda name: name.startswith(f"{COMPONENTS}/") and name.endswith(".wrl"),
-                    file.namelist()
-                ))
-                file.extractall(tempdir, components)
-
-                boards = {}
-                for board_dir in (zip_path / BOARDS).iterdir():
-                    bounds_path = board_dir / BOUNDS
-                    if not bounds_path.exists():
-                        continue
-                    
-                    try:
-                        bounds = struct.unpack("!ffff", bounds_path.read_bytes())
-                    except struct.error:
-                        self.warning(f"ignoring board \"{board_dir}\" (corrupted)")
-                        continue
-
-                    bounds = (
-                        Vector((bounds[0], -bounds[1])),
-                        Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3])))
-                    )
-
-                    stacked_boards = []
-                    stack_paths = [
-                        path for path in board_dir.iterdir() if path.name.startswith(STACKED)
-                    ]
-                    for path in board_dir.iterdir():
-                        if path.name.startswith(STACKED):
-                            try:
-                                offset = struct.unpack("!fff", path.read_bytes())
-                            except struct.error:
-                                self.warning("ignoring stacked board (corrupted)")
-                                continue
-
-                            stacked_boards.append((
-                                path.name.split(STACKED, 1)[-1],
-                                Vector((offset[0], -offset[1], offset[2])),
-                            ))
-
-                    boards[board_dir.name] = [bounds, stacked_boards, None]
-
+                pcb_file_content, components, boards = self.parse_pcb3d(file, tempdir)
         except BadZipFile:
             return self.error("not a valid .pcb3d file: not a zip file")
+        except KeyError as e:
+            return self.error(f"pcb3d file is corrupted: {e}")
 
         # import objects
 
@@ -383,6 +339,62 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             enhance_materials(pcb_materials)
 
         return {"FINISHED"}
+
+    def parse_pcb3d(self, file, extract_dir):
+        zip_path = ZipPath(file)
+
+        with file.open(PCB) as pcb_file:
+            pcb_file_content = pcb_file.read().decode("UTF-8")
+            with open(extract_dir / PCB, "wb") as filtered_file:
+                filtered = regex_filter_components.sub("\g<prefix>", pcb_file_content)
+                filtered_file.write(filtered.encode("UTF-8"))
+
+        components = {
+            name for name in file.namelist()
+            if name.startswith(f"{COMPONENTS}/") and name.endswith(".wrl")
+        }
+        file.extractall(extract_dir, components)
+
+        layers = (f"{LAYERS}/{layer}.svg" for layer in INCLUDED_LAYERS)
+        file.extractall(extract_dir, layers)
+
+        boards = {}
+        for board_dir in (zip_path / BOARDS).iterdir():
+            bounds_path = board_dir / BOUNDS
+            if not bounds_path.exists():
+                continue
+            
+            try:
+                bounds = struct.unpack("!ffff", bounds_path.read_bytes())
+            except struct.error:
+                self.warning(f"ignoring board \"{board_dir}\" (corrupted)")
+                continue
+
+            bounds = (
+                Vector((bounds[0], -bounds[1])),
+                Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3])))
+            )
+
+            stacked_boards = []
+            stack_paths = [
+                path for path in board_dir.iterdir() if path.name.startswith(STACKED)
+            ]
+            for path in board_dir.iterdir():
+                if path.name.startswith(STACKED):
+                    try:
+                        offset = struct.unpack("!fff", path.read_bytes())
+                    except struct.error:
+                        self.warning("ignoring stacked board (corrupted)")
+                        continue
+
+                    stacked_boards.append((
+                        path.name.split(STACKED, 1)[-1],
+                        Vector((offset[0], -offset[1], offset[2])),
+                    ))
+
+            boards[board_dir.name] = [bounds, stacked_boards, None]
+
+        return pcb_file_content, components, boards
 
     @staticmethod
     def import_wrl(context, filepath, join=True):

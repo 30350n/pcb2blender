@@ -1,13 +1,21 @@
-import pcbnew, tempfile, shutil, struct, re
+import pcbnew
+from pcbnew import PLOT_CONTROLLER as PlotController, PCB_PLOT_PARAMS, PLOT_FORMAT_SVG
+
+import tempfile, shutil, struct, re
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo
 from dataclasses import dataclass, field
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
+LAYERS = "layers"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
+
+INCLUDED_LAYERS = (
+    "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
+)
 
 @dataclass
 class StackedBoard:
@@ -27,10 +35,21 @@ def export_pcb3d(filepath, boarddefs):
     components_path = get_temppath(COMPONENTS)
     pcbnew.ExportVRML(wrl_path, 0.001, True, True, components_path, 0.0, 0.0)
 
+    layers_path = get_temppath(LAYERS)
+    export_layers(layers_path)
+
     with ZipFile(filepath, mode="w") as file:
-        # always ensure the BOARDS and COMPONENTS directories are created
-        file.writestr(BOARDS + "/", "")
+        # always ensure the COMPONENTS, LAYERS and BOARDS directories are created
         file.writestr(COMPONENTS + "/", "")
+        file.writestr(LAYERS + "/", "")
+        file.writestr(BOARDS + "/", "")
+
+        file.write(wrl_path, PCB)
+        for path in components_path.glob("**/*.wrl"):
+            file.write(path, str(Path(COMPONENTS) / path.name))
+
+        for path in layers_path.glob("**/*.svg"):
+            file.write(path, str(Path(LAYERS) / path.name))
 
         for boarddef in boarddefs.values():
             subdir = Path(BOARDS) / boarddef.name
@@ -42,10 +61,6 @@ def export_pcb3d(filepath, boarddefs):
                     str(subdir / (STACKED + stacked.name)),
                     struct.pack("!fff", *stacked.offset)
                 )
-
-        file.write(wrl_path, PCB)
-        for path in components_path.glob("**/*.wrl"):
-            file.write(path, str(Path(COMPONENTS) / path.name))
 
 def get_boarddefs(board):
     boarddefs = {}
@@ -114,6 +129,28 @@ def get_boarddefs(board):
     ignored += list(tls.keys()) + list(brs.keys()) + list(stacks.keys())
 
     return boarddefs, ignored
+
+def export_layers(output_directory):
+    board = pcbnew.GetBoard()
+    plot_controller = PlotController(board)
+    plot_options = plot_controller.GetPlotOptions()
+    plot_options.SetOutputDirectory(output_directory)
+
+    plot_options.SetPlotFrameRef(False)
+    plot_options.SetAutoScale(False)
+    plot_options.SetScale(1)
+    plot_options.SetMirror(False)
+    plot_options.SetUseGerberAttributes(True)
+    plot_options.SetExcludeEdgeLayer(True)
+    plot_options.SetDrillMarksType(PCB_PLOT_PARAMS.NO_DRILL_SHAPE)
+
+    for layer in INCLUDED_LAYERS:
+        plot_controller.SetLayer(getattr(pcbnew, layer))
+        plot_controller.OpenPlotfile(layer, PLOT_FORMAT_SVG, "")
+        plot_controller.PlotLayer()
+        filepath = Path(plot_controller.GetPlotFileName())
+        plot_controller.ClosePlot()
+        filepath.rename(filepath.parent / f"{layer}.svg")
 
 def sanitized(name):
     return re.sub("[\W]+", "_", name)
