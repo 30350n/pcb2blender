@@ -1,14 +1,16 @@
 import pcbnew
-from pcbnew import PLOT_CONTROLLER as PlotController, PCB_PLOT_PARAMS, PLOT_FORMAT_SVG
+from pcbnew import PLOT_CONTROLLER as PlotController, PCB_PLOT_PARAMS, PLOT_FORMAT_SVG, ToMM
 
 import tempfile, shutil, struct, re
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo
 from dataclasses import dataclass, field
+from xml.etree import ElementTree
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
 LAYERS = "layers"
+LAYERS_BOUNDS = "bounds"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
@@ -16,6 +18,8 @@ STACKED = "stacked_"
 INCLUDED_LAYERS = (
     "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
 )
+
+SVG_MARGIN = 1.0 # mm
 
 @dataclass
 class StackedBoard:
@@ -36,7 +40,13 @@ def export_pcb3d(filepath, boarddefs):
     pcbnew.ExportVRML(wrl_path, 0.001, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(LAYERS)
-    export_layers(layers_path)
+    board = pcbnew.GetBoard()
+    bounds = tuple(map(ToMM, board.ComputeBoundingBox(aBoardEdgesOnly=True).getWxRect()))
+    bounds = (
+        bounds[0] - SVG_MARGIN, bounds[1] - SVG_MARGIN,
+        bounds[2] + SVG_MARGIN * 2, bounds[3] + SVG_MARGIN * 2
+    )
+    export_layers(board, bounds, layers_path)
 
     with ZipFile(filepath, mode="w") as file:
         # always ensure the COMPONENTS, LAYERS and BOARDS directories are created
@@ -50,6 +60,7 @@ def export_pcb3d(filepath, boarddefs):
 
         for path in layers_path.glob("**/*.svg"):
             file.write(path, str(Path(LAYERS) / path.name))
+        file.writestr(str(Path(LAYERS) / LAYERS_BOUNDS), struct.pack("!ffff", *bounds))
 
         for boarddef in boarddefs.values():
             subdir = Path(BOARDS) / boarddef.name
@@ -130,8 +141,7 @@ def get_boarddefs(board):
 
     return boarddefs, ignored
 
-def export_layers(output_directory):
-    board = pcbnew.GetBoard()
+def export_layers(board, bounds, output_directory):
     plot_controller = PlotController(board)
     plot_options = plot_controller.GetPlotOptions()
     plot_options.SetOutputDirectory(output_directory)
@@ -150,7 +160,14 @@ def export_layers(output_directory):
         plot_controller.PlotLayer()
         filepath = Path(plot_controller.GetPlotFileName())
         plot_controller.ClosePlot()
-        filepath.rename(filepath.parent / f"{layer}.svg")
+        filepath = filepath.rename(filepath.parent / f"{layer}.svg")
+
+        svg = ElementTree.parse(filepath)
+        root = svg.getroot()
+        root.attrib["width"]  = f"{bounds[2] * 0.1:.6f}cm"
+        root.attrib["height"] = f"{bounds[3] * 0.1:.6f}cm"
+        root.attrib["viewBox"] = " ".join(str(round(v * 1e6)) for v in bounds)
+        svg.write(filepath)
 
 def sanitized(name):
     return re.sub("[\W]+", "_", name)

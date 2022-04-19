@@ -16,6 +16,7 @@ from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
 PCB = "pcb.wrl"
 COMPONENTS = "components"
 LAYERS = "layers"
+LAYERS_BOUNDS = "bounds"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
@@ -357,6 +358,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         layers = (f"{LAYERS}/{layer}.svg" for layer in INCLUDED_LAYERS)
         file.extractall(extract_dir, layers)
+
+        layers_bounds_path = zip_path / LAYERS / LAYERS_BOUNDS
+        layers_bounds = struct.unpack("!ffff", layers_bounds_path.read_bytes())
 
         boards = {}
         for board_dir in (zip_path / BOARDS).iterdir():
