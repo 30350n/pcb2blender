@@ -6,6 +6,7 @@ from mathutils import Vector, Matrix
 import tempfile, random, shutil, re, struct, math
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
+from dataclasses import dataclass
 import numpy as np
 
 from .materials import *
@@ -77,7 +78,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 MEMBERS = {path.name for path in ZipPath(file).iterdir()}
                 if missing := REQUIRED_MEMBERS.difference(MEMBERS):
                     return self.error(f"not a valid .pcb3d file: missing {str(missing)[1:-1]}")
-                pcb_file_content, components, boards = self.parse_pcb3d(file, tempdir)
+                pcb = self.parse_pcb3d(file, tempdir)
         except BadZipFile:
             return self.error("not a valid .pcb3d file: not a zip file")
         except KeyError as e:
@@ -186,7 +187,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         component_map = {}
         if self.import_components:
-            for component in components:
+            for component in pcb.components:
                 obj = self.import_wrl(context, tempdir / component)
                 component_map[component] = obj.data
                 bpy.data.objects.remove(obj)
@@ -197,13 +198,13 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # cut boards
 
-        if boards and self.cut_boards:
+        if pcb.boards and self.cut_boards:
             pcb_mesh = pcb_object.data
             bpy.data.objects.remove(pcb_object)
-            for name, (bounds, *dummy) in boards.items():
+            for name, board in pcb.boards.items():
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
                 context.collection.objects.link(board_obj)
-                boundingbox = self.get_boundingbox(context, bounds)
+                boundingbox = self.get_boundingbox(context, board.bounds)
 
                 mod_name = "Cut PCB"
                 mod = board_obj.modifiers.new(mod_name, type="BOOLEAN")
@@ -213,18 +214,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 bpy.ops.object.modifier_apply(modifier=mod_name)
                 bpy.data.objects.remove(boundingbox)
 
-                offset = 0.001 * bounds[0].to_3d()
+                offset = 0.001 * board.bounds[0].to_3d()
                 board_obj.data.transform(Matrix.Translation(-offset))
                 board_obj.location = offset
 
-                boards[name][2] = board_obj
+                board.obj = board_obj
         else:
             pcb_object.name = pcb_object.data.name = "PCB"
 
         # populate components
 
         if self.import_components:
-            match = regex_filter_components.search(pcb_file_content)
+            match = regex_filter_components.search(pcb.content)
             matrix_all = match2matrix(match)
             
             for match_instance in regex_component.finditer(match.group("instances")):
@@ -236,20 +237,20 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 instance.matrix_world = matrix_all @ matrix_instance
                 context.collection.objects.link(instance)
 
-                if boards:
+                if pcb.boards:
                     partial_matches = []
-                    for (bounds, _, board_obj) in boards.values():
+                    for board in boards.values():
                         x, y = instance.location.xy * 1000
-                        p_min, p_max = bounds
+                        p_min, p_max = board.bounds
 
                         in_bounds_x = x >= p_min.x and x < p_max.x
                         in_bounds_y = y <= p_min.y and y > p_max.y
                         if in_bounds_x and in_bounds_y:
-                            instance.parent = board_obj
+                            instance.parent = board.obj
                             instance.location -= p_min.to_3d() * 0.001
                             break
                         elif in_bounds_x or in_bounds_y:
-                            partial_matches.append((board_obj, p_min.to_3d() * 0.001))
+                            partial_matches.append((board.obj, p_min.to_3d() * 0.001))
                     else:
                         if len(partial_matches) == 1:
                             instance.parent = partial_matches[0][0]
@@ -258,16 +259,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                         closest = None
                         min_distance = math.inf
-                        for (name, board) in boards.items():
-                            center = (board[0][0] + board[0][1]) * 0.5
+                        for name, board in boards.items():
+                            center = (board.bounds[0] + board.bounds[1]) * 0.5
                             distance = (instance.location.xy * 1000 - center).length_squared
                             if distance < min_distance:
                                 min_distance = distance
                                 closest = (name, board)
 
                         name, board = closest
-                        instance.parent = board[2]
-                        instance.location -= board[0][0].to_3d() * 0.001
+                        instance.parent = board.obj
+                        instance.location -= board.bounds[0].to_3d() * 0.001
                         self.warning(
                             f"assigning component \"{component.name}\" (out of bounds) " \
                             f"to closest board \"{name}\""
@@ -293,14 +294,14 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         # stack boards
         
         if self.stack_boards:
-            for (_, stacked_boards, board_obj) in boards.values():
-                for (name, offset) in stacked_boards:
-                    if not name in boards:
+            for board in pcb.boards.values():
+                for (name, offset) in board.stacked_boards:
+                    if not name in pcb.boards:
                         self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
                         continue
 
-                    stacked_obj = boards[name][2]
-                    stacked_obj.parent = board_obj
+                    stacked_obj = pcb.boards[name].obj
+                    stacked_obj.parent = board.obj
 
                     pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
                     if name == "FPNL":
@@ -309,17 +310,17 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # select pcb objects and make one active
 
-        if boards:
+        if pcb.boards:
             bpy.ops.object.select_all(action="DESELECT")
-            top_level_boards = [board for board in boards.values() if not board[2].parent]
-            context.view_layer.objects.active = top_level_boards[0][2]
-            for (_, _, obj) in top_level_boards:
-                obj.select_set(True)
+            top_level_boards = [board for board in pcb.boards.values() if not board.obj.parent]
+            context.view_layer.objects.active = top_level_boards[0].obj
+            for board in top_level_boards:
+                board.obj.select_set(True)
 
         # center pcbs
 
         if self.center_pcb:
-            if boards:
+            if pcb.boards:
                 center = Vector((0, 0))
                 for ((pos1, pos2), _, _) in top_level_boards:
                     center += (pos1 + pos2) * 0.5 * 0.001
@@ -350,10 +351,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 filtered = regex_filter_components.sub("\g<prefix>", pcb_file_content)
                 filtered_file.write(filtered.encode("UTF-8"))
 
-        components = {
+        components = list({
             name for name in file.namelist()
             if name.startswith(f"{COMPONENTS}/") and name.endswith(".wrl")
-        }
+        })
         file.extractall(extract_dir, components)
 
         layers = (f"{LAYERS}/{layer}.svg" for layer in INCLUDED_LAYERS)
@@ -396,9 +397,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         Vector((offset[0], -offset[1], offset[2])),
                     ))
 
-            boards[board_dir.name] = [bounds, stacked_boards, None]
+            boards[board_dir.name] = Board(bounds, stacked_boards)
 
-        return pcb_file_content, components, boards
+        return PCB3D(pcb_file_content, components, layers_bounds, boards)
 
     @staticmethod
     def import_wrl(context, filepath, join=True):
@@ -530,6 +531,19 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     def warning(self, msg):
         print(f"warning: {msg}")
         self.report({"WARNING"}, msg)
+
+@dataclass
+class Board:
+    bounds: (Vector, Vector)
+    stacked_boards: [(str, Vector)]
+    obj: bpy.types.Object = None
+
+@dataclass
+class PCB3D:
+    content: str
+    components: [str]
+    layers_bounds: (float, float, float, float)
+    boards: dict[str, Board]
 
 regex_filter_components = re.compile(
     r"(?P<prefix>Transform\s*{\s*"
