@@ -176,6 +176,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         if self.import_components:
             for component in pcb.components:
                 obj = self.import_wrl(context, tempdir / component)
+                obj.data.transform(MATRIX_FIX_SCALE)
                 component_map[component] = obj.data
                 bpy.data.objects.remove(obj)
 
@@ -221,7 +222,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 component = component_map[url]
                 instance = bpy.data.objects.new(component.name, component)
-                instance.matrix_world = matrix_all @ matrix_instance
+                instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
 
                 if pcb.boards:
@@ -393,24 +394,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     @staticmethod
     def import_wrl(context, filepath, join=True):
         objects_before = set(bpy.data.objects)
-        bpy.ops.import_scene.x3d(filepath=str(filepath), axis_forward="Y", axis_up="Z")
+        bpy.ops.pcb2blender.import_x3d(filepath=str(filepath), scale=1.0, join=join)
         wrl_objects = set(bpy.data.objects).difference(objects_before)
 
-        if not join:
+        if join:
+            joined_obj = wrl_objects.pop()
+            joined_obj.name = joined_obj.data.name = filepath.name.split(".")[0]
+            return joined_obj
+        else:
             return sorted(wrl_objects, key=lambda obj: obj.name)
-
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in wrl_objects:
-            if obj.type == "MESH":
-                obj.select_set(True)
-
-        joined_obj = wrl_objects.pop()
-        joined_obj.name = joined_obj.data.name = filepath.name.split(".")[0]
-        context.view_layer.objects.active = joined_obj
-
-        bpy.ops.object.join()
-
-        return joined_obj
 
     @staticmethod
     def get_boundingbox(context, bounds):
@@ -539,6 +531,9 @@ class PCB3D:
     components: [str]
     layers_bounds: (float, float, float, float)
     boards: dict[str, Board]
+
+MATRIX_FIX_SCALE = Matrix.Scale(2.54e-3, 4)
+MATRIX_FIX_SCALE_INV = MATRIX_FIX_SCALE.inverted()
 
 regex_filter_components = re.compile(
     r"(?P<prefix>Transform\s*{\s*"
