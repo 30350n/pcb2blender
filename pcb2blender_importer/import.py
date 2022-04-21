@@ -212,7 +212,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # populate components
 
-        if self.import_components:
+        if self.import_components and component_map:
             match = regex_filter_components.search(pcb.content)
             matrix_all = match2matrix(match)
             
@@ -316,7 +316,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 matrix = Matrix.Translation(-center.to_3d())
                 for board in top_level_boards:
-                    self.apply_transformation(board, matrix)
+                    self.apply_transformation(board.obj, matrix)
             else:
                 center = Vector(pcb_object.bound_box[0]) + pcb_object.dimensions * 0.5
                 matrix = Matrix.Translation(-center)
