@@ -123,39 +123,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 self.cut_object(context, pads, mask_cutter, "DIFFERENCE")
                 bpy.data.objects.remove(mask_cutter)
 
-                # add 3d tracks to mask layer
-
-                self.extrude_mesh_z(mask.data, 0.5 * direction)
-
-                copper_cutter = self.copy_object(tracks, context.collection)
-
-                bpy.ops.object.select_all(action="DESELECT")
-                copper_cutter.select_set(True)
-                context.view_layer.objects.active = copper_cutter
-
-                bpy.ops.object.mode_set(mode="EDIT")
-                bpy.ops.mesh.remove_doubles()
-                bpy.ops.mesh.intersect_boolean(operation="UNION", use_self=True)
-                bpy.ops.mesh.select_all(action="SELECT")
-                bpy.ops.mesh.dissolve_limited(angle_limit=math.radians(5))
-                bpy.ops.mesh.quads_convert_to_tris()
-                bpy.ops.mesh.beautify_fill()
-                bpy.ops.mesh.inset(thickness=0.015, depth=0.008)
-                bpy.ops.mesh.remove_doubles(threshold=0.015)
-                bpy.ops.object.mode_set(mode="OBJECT")
-                bpy.ops.object.select_all(action="DESELECT")
-
-                self.cut_object(context, mask, copper_cutter, "DIFFERENCE")
-
-                bpy.data.objects.remove(copper_cutter)
-
-                bm = bmesh.new()
-                bm.from_mesh(mask.data)
-                bmesh.ops.delete(bm, geom=[v for v in bm.verts[:] if abs(v.co.z) > 0.8])
-                bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-                bm.to_mesh(mask.data)
-                bm.free()
-
                 # remove silkscreen on pads
 
                 pads_cutter = self.copy_object(pads, context.collection)
@@ -176,6 +143,26 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             vias = layers["Vias"]
             vias.data.transform(Matrix.Diagonal((1, 1, 0.97, 1)))
             vias.data.polygons.foreach_set("use_smooth", [True] * len(vias.data.polygons))
+
+            # fill holes in board mesh to make subsurface shading work
+            board = layers["Board"]
+            bm = bmesh.new()
+            bm.from_mesh(board.data)
+
+            new_edges = []
+            n_upper_verts = len(bm.verts) // 2
+            bm.verts.ensure_lookup_table()
+            for i, vert in enumerate(bm.verts[:n_upper_verts]):
+                other_vert = bm.verts[n_upper_verts + i]
+                try:
+                    bm.edges.new((vert, other_vert))
+                except ValueError:
+                    pass
+
+            bmesh.ops.holes_fill(bm, edges=bm.edges[:])
+
+            bm.to_mesh(board.data)
+            bm.free()
 
         pcb_object = pcb_objects[0]
         bpy.ops.object.select_all(action="DESELECT")
