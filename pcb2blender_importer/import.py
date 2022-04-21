@@ -569,7 +569,7 @@ def match2matrix(match):
 
     return matrix
 
-@orientation_helper(axis_forward="X", axis_up="Z")
+@orientation_helper(axis_forward="Y", axis_up="Z")
 class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     __doc__ = ImportX3D.__doc__
     bl_idname = "pcb2blender.import_x3d"
@@ -595,7 +595,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         objects = list(set(bpy.data.objects).difference(objects_before))
 
         for obj in objects:
-            obj.scale = Vector((1, 1, 1)) * self.scale
+            obj.scale *= self.scale
             obj.select_set(True)
         context.view_layer.objects.active = objects[0]
 
@@ -614,6 +614,10 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
         if self.enhance_materials:
             bpy.ops.object.shade_smooth()
+
+            for obj in objects:
+                if obj.type == "MESH":
+                    obj.data.use_auto_smooth = True
 
             merge_materials([obj.data for obj in objects])
             enhance_materials(sum((obj.data.materials[:] for obj in objects), []))
