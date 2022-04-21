@@ -14,8 +14,25 @@ def merge_materials(meshes):
 
 def enhance_materials(materials):
     for material in materials:
+        if not material.use_nodes:
+            continue
+
         if mat4cad_mat := Material.from_name(material.name):
-            mat4cad_mat.setup_node_tree(material.node_tree)
+            pass
+        elif material.name == "PIN-01":
+            mat4cad_mat = Material.from_name("special-pins_silver-default")
+        elif material.name == "PIN-02":
+            mat4cad_mat = Material.from_name("special-pins_gold-default")
+        elif material.name == "IC-BODY-EPOXY-04":
+            mat4cad_mat = Material.from_name("plastic-traffic_black-matte")
+        elif material.name == "IC-LABEL-01":
+            mat4cad_mat = Material.from_name("plastic-grey_white-semi_matte")
+        else:
+            continue
+
+        # only use the subsurface pcb mat if enhance boards is enabled
+
+        mat4cad_mat.setup_node_tree(material.node_tree)
 
 def is_same_color(a, b):
     return (Vector(a[:3]) - Vector(b[:3])).magnitude < 0.01
