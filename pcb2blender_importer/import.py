@@ -81,7 +81,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 pcb = self.parse_pcb3d(file, tempdir)
         except BadZipFile:
             return self.error("not a valid .pcb3d file: not a zip file")
-        except KeyError as e:
+        except (KeyError, struct.error) as e:
             return self.error(f"pcb3d file is corrupted: {e}")
 
         # import objects
