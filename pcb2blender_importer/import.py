@@ -309,15 +309,17 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         if self.center_pcb:
             if pcb.boards:
                 center = Vector((0, 0))
-                for ((pos1, pos2), _, _) in top_level_boards:
-                    center += (pos1 + pos2) * 0.5 * 0.001
+                for board in top_level_boards:
+                    center += (board.bounds[0] + board.bounds[1]) * 0.5 * 0.001
                 center /= len(top_level_boards)
 
-                for (_, _, obj) in top_level_boards:
-                    obj.location -= center.to_3d()
+                matrix = Matrix.Translation(-center.to_3d())
+                for board in top_level_boards:
+                    self.apply_transformation(board, matrix)
             else:
-                center = pcb_object.dimensions * 0.5 * Vector((1, -1, 1))
-                pcb_object.location = -(Vector(pcb_object.bound_box[3]) + center)
+                center = Vector(pcb_object.bound_box[0]) + pcb_object.dimensions * 0.5
+                matrix = Matrix.Translation(-center)
+                self.apply_transformation(pcb_object, matrix)
 
         # materials
 
@@ -470,6 +472,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     @staticmethod
     def translate_mesh_z(mesh, z):
         mesh.transform(Matrix.Translation((0, 0, z)))
+
+    @staticmethod
+    def apply_transformation(obj, matrix):
+        obj.data.transform(matrix)
+        for child in obj.children:
+            child.matrix_basis = matrix @ child.matrix_basis
 
     def draw(self, context):
         layout = self.layout
