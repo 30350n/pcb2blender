@@ -9,6 +9,9 @@ from zipfile import ZipFile, BadZipFile, Path as ZipPath
 from dataclasses import dataclass
 import numpy as np
 
+from cairosvg import svg2png
+from PIL import Image, ImageOps
+
 from .materials import *
 
 from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
@@ -26,7 +29,7 @@ INCLUDED_LAYERS = (
     "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
 )
 
-REQUIRED_MEMBERS = {PCB}
+REQUIRED_MEMBERS = {PCB, LAYERS}
 
 PCB_THICKNESS = 1.6 # mm
 
@@ -88,7 +91,57 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         materials_before = set(bpy.data.materials)
 
-        pcb_objects = self.import_wrl(context, tempdir / PCB, join=False)
+        objects_before = set(bpy.data.objects)
+        bpy.ops.pcb2blender.import_x3d(
+            filepath=str(tempdir / PCB), scale=1.0, join=False, enhance_materials=False)
+        pcb_objects = set(bpy.data.objects).difference(objects_before)
+        pcb_objects = sorted(pcb_objects, key=lambda obj: obj.name)
+
+        for obj in pcb_objects:
+            obj.data.transform(Matrix.Diagonal((*obj.scale, 1)))
+            obj.scale = (1, 1, 1)
+
+            self.setup_uvs(obj, pcb.layers_bounds)
+
+        # rasterize/import layer svgs
+
+        for layer in INCLUDED_LAYERS:
+            svg_path = str(tempdir / LAYERS / f"{layer}.svg")
+            png_path = str(tempdir / LAYERS / f"{layer}.png")
+            svg2png(url=svg_path, write_to=png_path, dpi=2032, negate_colors=True)
+        
+        for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
+            layer = f_layer[2:]
+            front = Image.open(tempdir / LAYERS / f"{f_layer}.png").getchannel("R")
+            back  = Image.open(tempdir / LAYERS / f"{b_layer}.png").getchannel("R")
+            empty = Image.new("L", front.size)
+
+            if layer == "Mask":
+                front = ImageOps.invert(front)
+                back  = ImageOps.invert(back)
+
+            png_path = tempdir / LAYERS / f"{layer}.png"
+            merged = Image.merge("RGB", (front, back, empty))
+            merged.save(png_path)
+
+            image = bpy.data.images.load(str(png_path))
+            image.pack()
+
+        # import components
+
+        component_map = {}
+        if self.import_components:
+            for component in pcb.components:
+                bpy.ops.pcb2blender.import_x3d(filepath=str(tempdir / component), scale=1.0)
+                obj = context.object
+                obj.data.name = filepath.name.rsplit(".", 1)[0]
+                obj.data.transform(MATRIX_FIX_SCALE)
+                component_map[component] = obj.data
+                bpy.data.objects.remove(obj)
+
+        pcb_materials = set(bpy.data.materials) - materials_before
+
+        shutil.rmtree(tempdir)
 
         # enhance pcb
 
@@ -97,72 +150,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             layers = dict(zip(PCB2_LAYER_NAMES, pcb_objects))
             for name, obj in layers.items():
                 obj.data.materials[0].name = name
+
+            board = layers["Board"]
+            self.improve_board_mesh(board.data)
         else:
-            print(f"warning: cannot enhance pcb"\
+            self.warning(f"cannot enhance pcb"\
                 f"(imported {len(pcb_objects)} layers, expected {len(PCB2_LAYER_NAMES)})")
 
         if can_enhance and self.enhance_pcb:
-            for side, direction in reversed(list(zip(("F", "B"), (1, -1)))):
-                mask = layers[f"{side}.Mask"]
-                copper = layers[f"{side}.Cu"]
-                silk = layers[f"{side}.Silk"]
-                paste = layers[f"{side}.Paste"]
-
-                pcb_objects.remove(paste)
-                bpy.data.objects.remove(paste)
-
-                # split copper layer into tracks and pads
-
-                tracks = copper
-                pads = self.copy_object(copper, context.collection)
-                pcb_objects.append(pads)
-
-                mask_cutter = self.copy_object(mask, context.collection)
-                self.extrude_mesh_z(mask_cutter.data, 0.25, True)
-                self.cut_object(context, tracks, mask_cutter, "INTERSECT")
-                self.cut_object(context, pads, mask_cutter, "DIFFERENCE")
-                bpy.data.objects.remove(mask_cutter)
-
-                # remove silkscreen on pads
-
-                pads_cutter = self.copy_object(pads, context.collection)
-                self.extrude_mesh_z(pads_cutter.data, 0.25, True)
-                self.cut_object(context, silk, pads_cutter, "DIFFERENCE")
-                bpy.data.objects.remove(pads_cutter)
-
-                silk.visible_shadow = False
-
-                # align the layers
-
-                self.translate_mesh_z(mask.data, -0.008 * direction)
-                self.translate_mesh_z(silk.data, -0.028 * direction)
-                self.translate_mesh_z(tracks.data, -0.004 * direction)
-                self.translate_mesh_z(pads.data, -0.004 * direction)
-
-            # scale down vias to match the other layers
-            vias = layers["Vias"]
-            vias.data.transform(Matrix.Diagonal((1, 1, 0.97, 1)))
-            vias.data.polygons.foreach_set("use_smooth", [True] * len(vias.data.polygons))
-
-            # fill holes in board mesh to make subsurface shading work
-            board = layers["Board"]
-            bm = bmesh.new()
-            bm.from_mesh(board.data)
-
-            new_edges = []
-            n_upper_verts = len(bm.verts) // 2
-            bm.verts.ensure_lookup_table()
-            for i, vert in enumerate(bm.verts[:n_upper_verts]):
-                other_vert = bm.verts[n_upper_verts + i]
-                try:
-                    bm.edges.new((vert, other_vert))
-                except ValueError:
-                    pass
-
-            bmesh.ops.holes_fill(bm, edges=bm.edges[:])
-
-            bm.to_mesh(board.data)
-            bm.free()
+            self.enhance_pcb_layers(context, layers)
+            pcb_objects = list(layers.values())
 
         pcb_object = pcb_objects[0]
         bpy.ops.object.select_all(action="DESELECT")
@@ -171,18 +168,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         context.view_layer.objects.active = pcb_object
         bpy.ops.object.join()
         bpy.ops.object.transform_apply()
-
-        component_map = {}
-        if self.import_components:
-            for component in pcb.components:
-                obj = self.import_wrl(context, tempdir / component)
-                obj.data.transform(MATRIX_FIX_SCALE)
-                component_map[component] = obj.data
-                bpy.data.objects.remove(obj)
-
-        shutil.rmtree(tempdir)
-
-        pcb_materials = set(bpy.data.materials) - materials_before
 
         # cut boards
 
@@ -392,19 +377,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         return PCB3D(pcb_file_content, components, layers_bounds, boards)
 
     @staticmethod
-    def import_wrl(context, filepath, join=True):
-        objects_before = set(bpy.data.objects)
-        bpy.ops.pcb2blender.import_x3d(filepath=str(filepath), scale=1.0, join=join)
-        wrl_objects = set(bpy.data.objects).difference(objects_before)
-
-        if join:
-            joined_obj = wrl_objects.pop()
-            joined_obj.name = joined_obj.data.name = filepath.name.split(".")[0]
-            return joined_obj
-        else:
-            return sorted(wrl_objects, key=lambda obj: obj.name)
-
-    @staticmethod
     def get_boundingbox(context, bounds):
         name = "pcb2blender_bounds_tmp"
         mesh = bpy.data.meshes.new(name)
@@ -426,6 +398,96 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         bm.free()
 
         return obj
+
+    @staticmethod
+    def setup_uvs(obj, layers_bounds):
+        mesh = obj.data
+
+        vertices = np.empty(len(mesh.vertices) * 3)
+        mesh.vertices.foreach_get("co", vertices)
+        vertices = vertices.reshape((len(mesh.vertices), 3))
+
+        indices = np.empty(len(mesh.loops), dtype=int)
+        mesh.loops.foreach_get("vertex_index", indices)
+
+        offset = np.array((layers_bounds[0], -layers_bounds[1]))
+        size = np.array((layers_bounds[2], layers_bounds[3]))
+        uvs = (1e3 * vertices[:,:2][indices] - offset) / size + np.array((0, 1))
+
+        uv_layer = mesh.uv_layers[0]
+        uv_layer.data.foreach_set("uv", uvs.flatten())
+
+    @staticmethod
+    def improve_board_mesh(mesh):
+        # fill holes in board mesh to make subsurface shading work
+        # use extra material for board edges
+
+        edge_material = mesh.materials[0].copy()
+        edge_material.name = "Board Edge"
+        edge_material_index = len(mesh.materials)
+        mesh.materials.append(edge_material)
+
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+
+        for face in bm.faces:
+            if abs(face.normal.z) < 0.01:
+                face.material_index = edge_material_index
+
+        new_edges = []
+        n_upper_verts = len(bm.verts) // 2
+        bm.verts.ensure_lookup_table()
+        for i, vert in enumerate(bm.verts[:n_upper_verts]):
+            other_vert = bm.verts[n_upper_verts + i]
+            try:
+                bm.edges.new((vert, other_vert))
+            except ValueError:
+                pass
+
+        bmesh.ops.holes_fill(bm, edges=bm.edges[:])
+
+        bm.to_mesh(mesh)
+        bm.free()
+
+    @classmethod
+    def enhance_pcb_layers(cls, context, layers):
+        for side, direction in reversed(list(zip(("F", "B"), (1, -1)))):
+            mask = layers[f"{side}.Mask"]
+            copper = layers[f"{side}.Cu"]
+            silk = layers[f"{side}.Silk"]
+
+            # split copper layer into tracks and pads
+
+            tracks = copper
+            pads = cls.copy_object(copper, context.collection)
+            layers[f"{side}.Pads"] = pads
+
+            mask_cutter = cls.copy_object(mask, context.collection)
+            cls.extrude_mesh_z(mask_cutter.data, 5e-4, True)
+            cls.cut_object(context, tracks, mask_cutter, "INTERSECT")
+            cls.cut_object(context, pads, mask_cutter, "DIFFERENCE")
+            bpy.data.objects.remove(mask_cutter)
+
+            # remove silkscreen on pads
+
+            pads_cutter = cls.copy_object(pads, context.collection)
+            cls.extrude_mesh_z(pads_cutter.data, 5e-4, True)
+            cls.cut_object(context, silk, pads_cutter, "DIFFERENCE")
+            bpy.data.objects.remove(pads_cutter)
+
+            silk.visible_shadow = False
+
+            # align the layers
+
+            cls.translate_mesh_z(mask.data, -2e-5 * direction)
+            cls.translate_mesh_z(silk.data, -7e-5 * direction)
+            cls.translate_mesh_z(tracks.data, -1e-5 * direction)
+            cls.translate_mesh_z(pads.data, -1e-5 * direction)
+
+        # scale down vias to match the other layers
+        vias = layers["Vias"]
+        vias.data.transform(Matrix.Diagonal((1, 1, 0.97, 1)))
+        vias.data.polygons.foreach_set("use_smooth", [True] * len(vias.data.polygons))
 
     @staticmethod
     def copy_object(obj, collection):
