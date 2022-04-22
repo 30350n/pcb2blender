@@ -49,6 +49,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     cut_boards:        BoolProperty(name="Cut PCBs", default=True)
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
+    texture_dpi:       FloatProperty(name="Texture DPI", default=2032.0, soft_min=508.0, soft_max=4064.0)
+
     import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
     fpnl_path:         StringProperty(name="", subtype="FILE_PATH",
@@ -108,7 +110,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         for layer in INCLUDED_LAYERS:
             svg_path = str(tempdir / LAYERS / f"{layer}.svg")
             png_path = str(tempdir / LAYERS / f"{layer}.png")
-            svg2png(url=svg_path, write_to=png_path, dpi=2032, negate_colors=True)
+            svg2png(url=svg_path, write_to=png_path, dpi=self.texture_dpi, negate_colors=True)
         
         for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
             layer = f_layer[2:]
@@ -545,6 +547,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layout.split()
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
+        layout.split()
+        layout.prop(self, "texture_dpi", slider=True)
 
         if has_svg2blender():
             layout.split()
