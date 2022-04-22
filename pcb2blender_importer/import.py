@@ -41,10 +41,11 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
     import_components: BoolProperty(name="Import Components", default=True)
     center_pcb:        BoolProperty(name="Center PCB", default=True)
-    enhance_pcb:       BoolProperty(name="Enhance PCB", default=True)
-
+    
     merge_materials:   BoolProperty(name="Merge Materials", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
+    pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
+        items=(("RASTERIZED", "Rasterized", ""), ("3D", "3D", "")))
 
     cut_boards:        BoolProperty(name="Cut PCBs", default=True)
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
@@ -159,17 +160,29 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             self.warning(f"cannot enhance pcb"\
                 f"(imported {len(pcb_objects)} layers, expected {len(PCB2_LAYER_NAMES)})")
 
-        if can_enhance and self.enhance_pcb:
-            self.enhance_pcb_layers(context, layers)
-            pcb_objects = list(layers.values())
+        if self.pcb_material == "3D":
+            if can_enhance:
+                self.enhance_pcb_layers(context, layers)
+                pcb_objects = list(layers.values())
 
-        pcb_object = pcb_objects[0]
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in pcb_objects:
-            obj.select_set(True)
-        context.view_layer.objects.active = pcb_object
-        bpy.ops.object.join()
-        bpy.ops.object.transform_apply()
+            pcb_object = pcb_objects[0]
+            bpy.ops.object.select_all(action="DESELECT")
+            for obj in pcb_objects:
+                obj.select_set(True)
+            context.view_layer.objects.active = pcb_object
+            bpy.ops.object.join()
+            bpy.ops.object.transform_apply()
+
+        else:
+            for obj in pcb_objects[1:]:
+                bpy.data.objects.remove(obj)
+            pcb_object = pcb_objects[0]
+
+            pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
+
+            bpy.ops.object.select_all(action="DESELECT")
+            pcb_object.select_set(True)
+            context.view_layer.objects.active = pcb_object
 
         # cut boards
 
@@ -540,10 +553,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         layout.prop(self, "import_components")
         layout.prop(self, "center_pcb")
-        layout.prop(self, "enhance_pcb")
         layout.split()
         layout.prop(self, "merge_materials")
         layout.prop(self, "enhance_materials")
+        layout.prop(self, "pcb_material")
         layout.split()
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
