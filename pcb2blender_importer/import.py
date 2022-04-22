@@ -431,7 +431,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         bm.from_mesh(mesh)
 
         for face in bm.faces:
-            if abs(face.normal.z) < 0.01:
+            if abs(face.normal.z) < 0.001 and face.calc_area() > 1e-10:
                 face.material_index = edge_material_index
 
         new_edges = []
