@@ -664,6 +664,11 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             obj.select_set(True)
         context.view_layer.objects.active = objects[0]
 
+        bpy.ops.object.shade_smooth()
+        for obj in objects:
+            if obj.type == "MESH":
+                obj.data.use_auto_smooth = True
+
         if self.join:
             bpy.ops.object.join()
             joined_obj = context.object
@@ -678,12 +683,6 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             bpy.ops.object.mode_set(mode="OBJECT")
 
         if self.enhance_materials:
-            bpy.ops.object.shade_smooth()
-
-            for obj in objects:
-                if obj.type == "MESH":
-                    obj.data.use_auto_smooth = True
-
             merge_materials([obj.data for obj in objects])
             enhance_materials(sum((obj.data.materials[:] for obj in objects), []))
 
