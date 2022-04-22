@@ -30,8 +30,6 @@ def enhance_materials(materials):
         else:
             continue
 
-        # only use the subsurface pcb mat if enhance boards is enabled
-
         mat4cad_mat.setup_node_tree(material.node_tree)
 
 def is_same_color(a, b):
