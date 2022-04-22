@@ -11,11 +11,29 @@ bl_info = {
 }
 
 import bpy
-import importlib
+import importlib, subprocess, sys
+from pathlib import Path
 
+dependencies = {
+    "cairosvg": "cairosvg",
+    "pillow": "PIL",
+}
 module_names = ("import",)
-modules = []
 
+dependency_path = str((Path(__file__).parent / "site-packages").resolve())
+sys.path.append(dependency_path)
+
+missing = []
+for dependency, module_name in dependencies.items():
+    if not importlib.util.find_spec(module_name):
+        missing.append(dependency)
+if missing:
+    subprocess.check_call((
+        sys.executable, "-m",
+        "pip", "install", *missing, "-t", dependency_path
+    ))
+
+modules = []
 for module_name in module_names:
     if module_name in locals():
         modules.append(importlib.reload(locals()[module_name]))
