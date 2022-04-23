@@ -1,8 +1,13 @@
 from .mat4cad import *
 from .mat4cad.blender import *
+from .custom_node_utils import *
 
 import bpy
 from mathutils import Vector
+from bpy.props import EnumProperty
+
+from nodeitems_utils import NodeItem
+from nodeitems_builtins import ShaderNodeCategory
 
 def merge_materials(meshes):
     for mesh in meshes:
@@ -31,3 +36,183 @@ def enhance_materials(materials):
             continue
 
         mat4cad_mat.setup_node_tree(material.node_tree)
+
+class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
+    bl_label = "Solder Mask BSDF"
+    bl_width_default = 200
+
+    def update_props(self, context):
+        roughness = 0.5
+        match self.soldermask:
+            case "GREEN":
+                light_color = hex2rgb("28a125")
+                dark_color  = hex2rgb("155211")
+            case "RED":
+                light_color = hex2rgb("e50007")
+                dark_color  = hex2rgb("731114")
+            case "YELLOW":
+                light_color = hex2rgb("dac92b")
+                dark_color  = hex2rgb("687c19")
+            case "BLUE":
+                light_color = hex2rgb("116cc2")
+                dark_color  = hex2rgb("053059")
+            case "WHITE":
+                light_color = hex2rgb("d3cfc9")
+                dark_color  = hex2rgb("e1dddc")
+                roughness = 0.3
+            case "BLACK":
+                light_color = hex2rgb("191918")
+                dark_color  = hex2rgb("000000")
+                roughness = 0.9
+
+        if not self.soldermask == "CUSTOM":
+            self.inputs["Light Color"].default_value = (*light_color, 1.0)
+            self.inputs["Dark Color"].default_value  = (*dark_color,  1.0)
+            self.inputs["Roughness"].default_value   = roughness
+
+        hidden = self.soldermask != "CUSTOM"
+        for input_name in ("Light Color", "Dark Color", "Roughness"):
+            self.inputs[input_name].hide = hidden
+
+    soldermask: EnumProperty(name="Solder Mask", update=update_props, items=(
+        ("GREEN",  "Green",  ""),
+        ("RED",    "Red",    ""),
+        ("YELLOW", "Yellow", ""),
+        ("BLUE",   "Blue",   ""),
+        ("WHITE",  "White",  ""),
+        ("BLACK",  "Black",  ""),
+        ("CUSTOM", "Custom", ""),
+    ))
+
+    def init(self, context):
+        inputs = {
+            "Light Color": ("NodeSocketColor",  {}),
+            "Dark Color":  ("NodeSocketColor",  {}),
+            "Roughness":   ("NodeSocketFloat",  {}),
+            "Normal":      ("NodeSocketVector", {"hide_value": True}),
+            "F_Cu": ("NodeSocketFloat", {"hide_value": True}),
+            "B_Cu": ("NodeSocketFloat", {"hide_value": True}),
+        }
+
+        nodes = {
+            "geometry": ("ShaderNodeNewGeometry", {}, {}),
+            "separate_position": ("ShaderNodeSeparateXYZ", {},
+                {"Vector" : ("geometry", "Position")}),
+            "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
+                {"Value": ("separate_position", "Z")}),
+
+            "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+                "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
+            "cu_invert": ("ShaderNodeInvert", {}, {"Color": ("cu", 0)}),
+
+            "mix_color": ("ShaderNodeMixRGB", {}, {"Fac": ("cu", 0),
+                1: ("inputs", "Dark Color"), 2: ("inputs", "Light Color")}),
+            "subsurface": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("cu_invert", 0), 1: 0.001}),
+            "ssr": ("ShaderNodeBrightContrast", {},
+                {"Color": ("mix_color", 0), "Bright": 0.25}),
+
+            "shader": ("ShaderNodeBsdfPrincipled", {}, {
+                "Base Color": ("mix_color", 0), "Subsurface Color": ("mix_color", 0),
+                "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
+                "Roughness": ("inputs", "Roughness"), "Normal": ("inputs", "Normal")}),
+        }
+
+        outputs = {
+            "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
+        }
+
+        self.init_node_tree(inputs, nodes, outputs)
+        self.update_props(context)
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "soldermask", text="")
+
+class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
+    bl_label = "PCB Shader"
+    bl_width_default = 200
+
+    def init(self, context):
+        inputs = {
+            "Base Material":  ("NodeSocketShader", {}),
+            "Exposed Copper": ("NodeSocketShader", {}),
+            "Solder Mask":    ("NodeSocketShader", {}),
+            "Silkscreen":     ("NodeSocketShader", {}),
+            "Solder":         ("NodeSocketShader", {}),
+            "F_Cu":    ("NodeSocketFloat", {"hide_value": True}),
+            "B_Cu":    ("NodeSocketFloat", {"hide_value": True}),
+            "F_Mask":  ("NodeSocketFloat", {"hide_value": True}),
+            "B_Mask":  ("NodeSocketFloat", {"hide_value": True}),
+            "F_SilkS": ("NodeSocketFloat", {"hide_value": True}),
+            "B_SilkS": ("NodeSocketFloat", {"hide_value": True}),
+            "F_Paste": ("NodeSocketFloat", {"hide_value": True}),
+            "B_Paste": ("NodeSocketFloat", {"hide_value": True}),
+        }
+
+        nodes = {
+            "geometry": ("ShaderNodeNewGeometry", {}, {}),
+            "separate_position": ("ShaderNodeSeparateXYZ", {},
+                {"Vector" : ("geometry", "Position")}),
+            "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
+                {"Value": ("separate_position", "Z")}),
+
+            "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+                "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
+            "mask": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+                "Color1": ("inputs", "F_Mask"), "Color2": ("inputs", "B_Mask")}),
+            "silks": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+                "Color1": ("inputs", "F_SilkS"), "Color2": ("inputs", "B_SilkS")}),
+            "paste": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+                "Color1": ("inputs", "F_Paste"), "Color2": ("inputs", "B_Paste")}),
+
+            "mix_cu": ("ShaderNodeMixShader", {}, {"Fac": ("cu", 0),
+                1: ("inputs", "Base Material"), 2: ("inputs", "Exposed Copper")}),
+            "mix_mask": ("ShaderNodeMixShader", {}, {"Fac": ("mask", 0),
+                1: ("mix_cu", 0), 2: ("inputs", "Solder Mask")}),
+            "mix_silks": ("ShaderNodeMixShader", {}, {"Fac": ("silks", 0),
+                1: ("mix_mask", 0), 2: ("inputs", "Silkscreen")}),
+            "mix_solder": ("ShaderNodeMixShader", {}, {"Fac": ("paste", 0),
+                1: ("mix_silks", 0), 2: ("inputs", "Solder")}),
+
+            "multiply_mask": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("mask", 0), 1: 0.02}),
+            "multiply_cu": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+                {0: ("cu", 0), 1: 0.03, 2: ("multiply_mask", 0)}),
+            "multiply_silks": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("silks", 0), 1: 0.0495}),
+            "max_silks": ("ShaderNodeMath", {"operation": "MAXIMUM"},
+                {0: ("multiply_cu", 0), 1: ("multiply_silks", 0)}),
+            "multiply_scale": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("max_silks", 0), 1: 0.001}),
+            "displacement": ("ShaderNodeDisplacement", {},
+                {"Height": ("multiply_scale", 0)}),
+        }
+
+        outputs = {
+            "BSDF": ("NodeSocketShader", {}, ("mix_solder", 0)),
+            "Displacement": ("NodeSocketVector", {}, ("displacement", 0)),
+        }
+
+        self.init_node_tree(inputs, nodes, outputs)
+
+shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", items=(
+    NodeItem("ShaderNodeSolderMaskShader"),
+    NodeItem("ShaderNodePcbShader"),
+))
+
+classes = (
+    ShaderNodeSolderMaskShader,
+    ShaderNodePcbShader,
+)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+    register_node_category("SHADER", shader_node_category)
+
+def unregister():
+    unregister_node_category("SHADER", shader_node_category)
+
+    for cls in classes:
+        bpy.utils.unregister_class(cls)

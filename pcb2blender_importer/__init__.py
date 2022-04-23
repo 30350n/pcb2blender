@@ -18,7 +18,7 @@ dependencies = {
     "cairosvg": "cairosvg",
     "pillow": "PIL",
 }
-module_names = ("import",)
+module_names = ("import", "materials")
 
 dependency_path = str((Path(__file__).parent / "site-packages").resolve())
 sys.path.append(dependency_path)
