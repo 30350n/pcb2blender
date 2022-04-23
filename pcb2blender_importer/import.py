@@ -227,7 +227,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 if pcb.boards:
                     partial_matches = []
-                    for board in boards.values():
+                    for board in pcb.boards.values():
                         x, y = instance.location.xy * 1000
                         p_min, p_max = board.bounds
 
@@ -247,7 +247,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                         closest = None
                         min_distance = math.inf
-                        for name, board in boards.items():
+                        for name, board in pcb.boards.items():
                             center = (board.bounds[0] + board.bounds[1]) * 0.5
                             distance = (instance.location.xy * 1000 - center).length_squared
                             if distance < min_distance:
@@ -275,7 +275,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     setup_camera=self.fpnl_setup_camera
                 )
 
-                boards["FPNL"] = [(Vector((0, 0)), None), [], context.object]
+                pcb.boards["FPNL"] = [(Vector((0, 0)), None), [], context.object]
             else:
                 self.warning(f"frontpanel file \"{filepath}\" does not exist")
         
