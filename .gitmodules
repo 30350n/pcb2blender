@@ -1,3 +1,6 @@
 [submodule "pcb2blender_importer/mat4cad"]
 	path = pcb2blender_importer/mat4cad
 	url = https://github.com/30350n/mat4cad.git
+[submodule "pcb2blender_importer/custom_node_utils"]
+	path = pcb2blender_importer/custom_node_utils
+	url = https://github.com/30350n/custom_node_utils.git
