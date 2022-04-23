@@ -12,7 +12,7 @@ import numpy as np
 from cairosvg import svg2png
 from PIL import Image, ImageOps
 
-from .materials import *
+from .materials import merge_materials, enhance_materials
 
 from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
 from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
@@ -610,6 +610,19 @@ class PCB3D:
     components: [str]
     layers_bounds: (float, float, float, float)
     boards: dict[str, Board]
+
+PCB2_LAYER_NAMES = (
+    "Board",
+    "F_Cu",
+    "F_Paste",
+    "F_Mask",
+    "B_Cu",
+    "B_Paste",
+    "B_Mask",
+    "Vias",
+    "F_Silk",
+    "B_Silk",
+)
 
 MATRIX_FIX_SCALE = Matrix.Scale(2.54e-3, 4)
 MATRIX_FIX_SCALE_INV = MATRIX_FIX_SCALE.inverted()

@@ -31,19 +31,3 @@ def enhance_materials(materials):
             continue
 
         mat4cad_mat.setup_node_tree(material.node_tree)
-
-def is_same_color(a, b):
-    return (Vector(a[:3]) - Vector(b[:3])).magnitude < 0.01
-
-PCB2_LAYER_NAMES = (
-    "Board",
-    "F.Cu",
-    "F.Paste",
-    "F.Mask",
-    "B.Cu",
-    "B.Paste",
-    "B.Mask",
-    "Vias",
-    "F.Silk",
-    "B.Silk",
-)
