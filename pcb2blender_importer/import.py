@@ -600,15 +600,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
 @dataclass
 class Board:
-    bounds: (Vector, Vector)
-    stacked_boards: [(str, Vector)]
+    bounds: tuple[Vector, Vector]
+    stacked_boards: list[tuple[str, Vector]]
     obj: bpy.types.Object = None
 
 @dataclass
 class PCB3D:
     content: str
-    components: [str]
-    layers_bounds: (float, float, float, float)
+    components: list[str]
+    layers_bounds: tuple[float, float, float, float]
     boards: dict[str, Board]
 
 PCB2_LAYER_NAMES = (
