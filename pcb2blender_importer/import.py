@@ -108,27 +108,29 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # rasterize/import layer svgs
 
-        for layer in INCLUDED_LAYERS:
-            svg_path = str(tempdir / LAYERS / f"{layer}.svg")
-            png_path = str(tempdir / LAYERS / f"{layer}.png")
-            svg2png(url=svg_path, write_to=png_path, dpi=self.texture_dpi, negate_colors=True)
-        
-        for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
-            layer = f_layer[2:]
-            front = Image.open(tempdir / LAYERS / f"{f_layer}.png").getchannel("R")
-            back  = Image.open(tempdir / LAYERS / f"{b_layer}.png").getchannel("R")
-            empty = Image.new("L", front.size)
+        if self.pcb_material == "RASTERIZED":
+            for layer in INCLUDED_LAYERS:
+                svg_path = str(tempdir / LAYERS / f"{layer}.svg")
+                png_path = str(tempdir / LAYERS / f"{layer}.png")
+                svg2png(url=svg_path, write_to=png_path, dpi=self.texture_dpi, negate_colors=True)
 
-            if layer == "Mask":
-                front = ImageOps.invert(front)
-                back  = ImageOps.invert(back)
+            for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
+                layer = f_layer[2:]
+                front = Image.open(tempdir / LAYERS / f"{f_layer}.png").getchannel("R")
+                back  = Image.open(tempdir / LAYERS / f"{b_layer}.png").getchannel("R")
+                empty = Image.new("L", front.size)
 
-            png_path = tempdir / LAYERS / f"{layer}.png"
-            merged = Image.merge("RGB", (front, back, empty))
-            merged.save(png_path)
+                if layer == "Mask":
+                    front = ImageOps.invert(front)
+                    back  = ImageOps.invert(back)
 
-            image = bpy.data.images.load(str(png_path))
-            image.pack()
+                png_path = tempdir / LAYERS / f"{layer}.png"
+                merged = Image.merge("RGB", (front, back, empty))
+                merged.save(png_path)
+
+                image = bpy.data.images.load(str(png_path))
+                image.colorspace_settings.name = "Non-Color"
+                image.pack()
 
         # import components
 
