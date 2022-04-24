@@ -391,9 +391,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             )
 
             stacked_boards = []
-            stack_paths = [
-                path for path in board_dir.iterdir() if path.name.startswith(STACKED)
-            ]
             for path in board_dir.iterdir():
                 if path.name.startswith(STACKED):
                     try:
@@ -469,7 +466,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             if abs(face.normal.z) < 0.001 and face.calc_area() > 1e-10:
                 face.material_index = edge_material_index
 
-        new_edges = []
         n_upper_verts = len(bm.verts) // 2
         bm.verts.ensure_lookup_table()
         for i, vert in enumerate(bm.verts[:n_upper_verts]):
