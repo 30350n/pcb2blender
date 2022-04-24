@@ -161,6 +161,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             self.warning(f"cannot enhance pcb"\
                 f"(imported {len(pcb_objects)} layers, expected {len(PCB2_LAYER_NAMES)})")
 
+        pcb_meshes = {obj.data for obj in pcb_objects if obj.type == "MESH"}
+
         if self.pcb_material == "3D":
             if can_enhance:
                 self.enhance_pcb_layers(context, layers)
@@ -184,6 +186,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             bpy.ops.object.select_all(action="DESELECT")
             pcb_object.select_set(True)
             context.view_layer.objects.active = pcb_object
+
+        for mesh in pcb_meshes:
+            if not mesh.users:
+                bpy.data.meshes.remove(mesh)
 
         # cut boards
 
@@ -327,6 +333,11 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         if self.merge_materials:
             merge_materials(component_map.values())
+
+        for material in pcb_materials.copy():
+            if not material.users:
+                pcb_materials.remove(material)
+                bpy.data.materials.remove(material)
 
         if self.enhance_materials:
             enhance_materials(pcb_materials)
@@ -701,7 +712,12 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
                 obj.data.use_auto_smooth = True
 
         if self.join:
+            meshes = {obj.data for obj in objects if obj.type == "MESH"}
             bpy.ops.object.join()
+            for mesh in meshes:
+                if not mesh.users:
+                    bpy.data.meshes.remove(mesh)
+
             joined_obj = context.object
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
             joined_obj.data.name = joined_obj.name
