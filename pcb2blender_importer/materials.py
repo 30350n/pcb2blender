@@ -1,5 +1,5 @@
-from .mat4cad import *
-from .mat4cad.blender import *
+from .mat4cad.core import Material, hex2rgb, srgb2lin
+from .mat4cad.blender import ShaderNodeBsdfMat4cad
 from .custom_node_utils import *
 
 import bpy
@@ -66,8 +66,8 @@ class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCus
                 roughness = 0.9
 
         if not self.soldermask == "CUSTOM":
-            self.inputs["Light Color"].default_value = (*light_color, 1.0)
-            self.inputs["Dark Color"].default_value  = (*dark_color,  1.0)
+            self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
+            self.inputs["Dark Color"].default_value  = (*srgb2lin(dark_color),  1.0)
             self.inputs["Roughness"].default_value   = roughness
 
         hidden = self.soldermask != "CUSTOM"
@@ -130,7 +130,7 @@ class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCus
 
 class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
     bl_label = "PCB Shader"
-    bl_width_default = 200
+    bl_width_default = 140
 
     def init(self, context):
         inputs = {
@@ -196,11 +196,13 @@ class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGrou
         self.init_node_tree(inputs, nodes, outputs)
 
 shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", items=(
+    NodeItem("ShaderNodeBsdfMat4cad"),
     NodeItem("ShaderNodeSolderMaskShader"),
     NodeItem("ShaderNodePcbShader"),
 ))
 
 classes = (
+    ShaderNodeBsdfMat4cad,
     ShaderNodeSolderMaskShader,
     ShaderNodePcbShader,
 )
