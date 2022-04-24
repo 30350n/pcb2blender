@@ -135,9 +135,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         component_map = {}
         if self.import_components:
             for component in pcb.components:
-                bpy.ops.pcb2blender.import_x3d(filepath=str(tempdir / component), scale=1.0)
+                bpy.ops.pcb2blender.import_x3d(
+                    filepath=str(tempdir / component), scale=1.0, enhance_materials=False)
                 obj = context.object
-                obj.data.name = filepath.name.rsplit(".", 1)[0]
+                obj.data.name = component.rsplit(".", 1)[0]
                 obj.data.transform(MATRIX_FIX_SCALE)
                 component_map[component] = obj.data
                 bpy.data.objects.remove(obj)
