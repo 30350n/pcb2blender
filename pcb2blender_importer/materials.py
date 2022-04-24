@@ -36,6 +36,56 @@ def enhance_materials(materials):
 
         mat4cad_mat.setup_node_tree(material.node_tree)
 
+def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.types.Image]):
+    node_tree.nodes.clear()
+
+    nodes = {
+        "cu":    ("ShaderNodeTexImage", {"location": (-500, -240), "hide": True,
+            "interpolation": "Cubic", "image": images["Cu"]}, {}),
+        "mask":  ("ShaderNodeTexImage", {"location": (-500, -280), "hide": True,
+            "interpolation": "Cubic", "image": images["Mask"]}, {}),
+        "silks": ("ShaderNodeTexImage", {"location": (-500, -320), "hide": True,
+            "interpolation": "Cubic", "image": images["SilkS"]}, {}),
+        "paste": ("ShaderNodeTexImage", {"location": (-500, -360), "hide": True,
+            "interpolation": "Cubic", "image": images["Paste"]}, {}),
+
+        "seperate_cu":    ("ShaderNodeSeparateRGB", {"location": (-200, -240), "hide": True}, 
+            {"Image": ("cu",    "Color")}),
+        "seperate_mask":  ("ShaderNodeSeparateRGB", {"location": (-200, -280), "hide": True}, 
+            {"Image": ("mask",  "Color")}),
+        "seperate_silks": ("ShaderNodeSeparateRGB", {"location": (-200, -320), "hide": True}, 
+            {"Image": ("silks", "Color")}),
+        "seperate_paste": ("ShaderNodeSeparateRGB", {"location": (-200, -360), "hide": True}, 
+            {"Image": ("paste", "Color")}),
+
+        "base_material": ("ShaderNodeBsdfMat4cad", {"location": (-200, 0),
+            "mat_base": "PCB", "mat_color": "PCB_YELLOW"}, {}),
+        "exposed_copper": ("ShaderNodeBsdfMat4cad", {"location": (-400, 0),
+            "mat_base": "METAL", "mat_color": "COPPER", "mat_variant": "GLOSSY"}, {}),
+        "solder_mask": ("ShaderNodeSolderMaskShader", {"location": (-660, 0)},
+            {"F_Cu": ("seperate_cu", "R"), "B_Cu": ("seperate_cu", "G")}),
+        "silkscreen": ("ShaderNodeBsdfMat4cad", {"location": (-860, 0),
+            "mat_base": "PLASTIC", "mat_color": "PURE_WHITE", "mat_variant": "GLOSSY"}, {}),
+        "solder": ("ShaderNodeBsdfMat4cad", {"location": (-1120, 0),
+            "mat_base": "METAL", "mat_color": "SILVER", "mat_variant": "GLOSSY"}, {}),
+
+        "shader": ("ShaderNodePcbShader", {}, {
+            "F_Cu":    ("seperate_cu",    "R"), "B_Cu":    ("seperate_cu",    "G"),
+            "F_Mask":  ("seperate_mask",  "R"), "B_Mask":  ("seperate_mask",  "G"),
+            "F_SilkS": ("seperate_silks", "R"), "B_SilkS": ("seperate_silks", "G"),
+            "F_Paste": ("seperate_paste", "R"), "B_Paste": ("seperate_paste", "G"),
+            "Base Material":  ("base_material",  "BSDF"),
+            "Exposed Copper": ("exposed_copper", "BSDF"),
+            "Solder Mask":    ("solder_mask",    "BSDF"),
+            "Silkscreen":     ("silkscreen",     "BSDF"),
+            "Solder":         ("solder",         "BSDF"),
+        }),
+        "output": ("ShaderNodeOutputMaterial", {"location": (200, 0)},
+            {"Surface": ("shader", "BSDF"), "Displacement": ("shader","Displacement")}),
+    }
+
+    setup_node_tree(node_tree, nodes)
+
 class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 200

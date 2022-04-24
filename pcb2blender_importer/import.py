@@ -12,7 +12,7 @@ import numpy as np
 from cairosvg import svg2png
 from PIL import Image, ImageOps
 
-from .materials import merge_materials, enhance_materials
+from .materials import setup_pcb_material, merge_materials, enhance_materials
 
 from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
 from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
@@ -114,6 +114,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 png_path = str(tempdir / LAYERS / f"{layer}.png")
                 svg2png(url=svg_path, write_to=png_path, dpi=self.texture_dpi, negate_colors=True)
 
+            images = {}
             for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
                 layer = f_layer[2:]
                 front = Image.open(tempdir / LAYERS / f"{f_layer}.png").getchannel("R")
@@ -131,6 +132,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 image = bpy.data.images.load(str(png_path))
                 image.colorspace_settings.name = "Non-Color"
                 image.pack()
+
+                images[layer] = image
 
         # import components
 
@@ -184,6 +187,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             pcb_object = pcb_objects[0]
 
             pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
+
+            board_material = pcb_object.data.materials[0]
+            setup_pcb_material(board_material.node_tree, images)
 
             bpy.ops.object.select_all(action="DESELECT")
             pcb_object.select_set(True)
