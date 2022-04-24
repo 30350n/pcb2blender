@@ -143,7 +143,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 bpy.ops.pcb2blender.import_x3d(
                     filepath=str(tempdir / component), scale=1.0, enhance_materials=False)
                 obj = context.object
-                obj.data.name = component.rsplit(".", 1)[0]
+                obj.data.name = component.rsplit("/", 1)[1].rsplit(".", 1)[0]
                 obj.data.transform(MATRIX_FIX_SCALE)
                 component_map[component] = obj.data
                 bpy.data.objects.remove(obj)
@@ -452,19 +452,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     @staticmethod
     def improve_board_mesh(mesh):
         # fill holes in board mesh to make subsurface shading work
-        # use extra material for board edges
-
-        edge_material = mesh.materials[0].copy()
-        edge_material.name = "Board Edge"
-        edge_material_index = len(mesh.materials)
-        mesh.materials.append(edge_material)
+        # create vertex color layer for board edge
 
         bm = bmesh.new()
         bm.from_mesh(mesh)
 
+        board_edge = bm.loops.layers.color.new("Board Edge")
+
         for face in bm.faces:
-            if abs(face.normal.z) < 0.001 and face.calc_area() > 1e-10:
-                face.material_index = edge_material_index
+            color = ((1, 1, 1, 1) if abs(face.normal.z) < 1e-3 and face.calc_area() > 1e-10
+                else (0, 0, 0, 1))
+            for loop in face.loops:
+                loop[board_edge] = color
 
         n_upper_verts = len(bm.verts) // 2
         bm.verts.ensure_lookup_table()
