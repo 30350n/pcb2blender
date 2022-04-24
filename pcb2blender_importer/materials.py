@@ -3,7 +3,6 @@ from .mat4cad.blender import ShaderNodeBsdfMat4cad
 from .custom_node_utils import *
 
 import bpy
-from mathutils import Vector
 from bpy.props import EnumProperty
 
 from nodeitems_utils import NodeItem
@@ -95,11 +94,11 @@ class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCus
         }
 
         nodes = {
-            "geometry": ("ShaderNodeNewGeometry", {}, {}),
+            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector" : ("geometry", "Position")}),
+                {"Vector" : ("tex_coord", "Object")}),
             "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
-                {"Value": ("separate_position", "Z")}),
+                {0: ("separate_position", "Z"), 1: 0.0}),
 
             "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
                 "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
@@ -150,11 +149,11 @@ class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGrou
         }
 
         nodes = {
-            "geometry": ("ShaderNodeNewGeometry", {}, {}),
+            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector" : ("geometry", "Position")}),
+                {"Vector" : ("tex_coord", "Object")}),
             "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
-                {"Value": ("separate_position", "Z")}),
+                {0: ("separate_position", "Z"), 1: 0.0}),
 
             "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
                 "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
