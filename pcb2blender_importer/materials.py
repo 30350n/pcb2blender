@@ -182,7 +182,7 @@ class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
                 dark_color  = hex2rgb("e1dddc")
                 roughness = 0.3
             case "BLACK":
-                light_color = hex2rgb("191918")
+                light_color = hex2rgb("10100f")
                 dark_color  = hex2rgb("000000")
                 roughness = 0.9
 
