@@ -458,13 +458,18 @@ class ShaderNodePcbShader(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
                 "Color1": ("inputs", "F_SilkS"), "Color2": ("inputs", "B_SilkS")}),
             "paste": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
                 "Color1": ("inputs", "F_Paste"), "Color2": ("inputs", "B_Paste")}),
+            
+            "cu_exposed": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
+                {0: ("cu", 0), 1: ("mask", 0)}),
+            "silks_cut": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
+                {0: ("silks", 0), 1: ("cu_exposed", 0)}),
 
             "silks_noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
                 "Scale": 5000, "Detail": 0.5, "Roughness": 0.1, "Distortion": 0.1}),
             "silks_quality": ("ShaderNodeMapRange", {"clamp": False}, {
                 "Value": ("inputs", "Silkscreen Quality"), "To Min": -0.65, "To Max": -0.95}),
             "silks_combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("silks", 0), 1: ("silks_quality", 0), 2: ("silks_noise", "Fac")}),
+                {0: ("silks_cut", 0), 1: ("silks_quality", 0), 2: ("silks_noise", "Fac")}),
             "silks_damaged": ("ShaderNodeMath", {"operation": "MULTIPLY", "use_clamp": True},
                 {0: ("silks_combined", 0), 1: -15.0}),
 
