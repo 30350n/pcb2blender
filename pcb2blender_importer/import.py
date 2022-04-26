@@ -209,12 +209,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 context.collection.objects.link(board_obj)
                 boundingbox = self.get_boundingbox(context, board.bounds)
 
-                mod_name = "Cut PCB"
-                mod = board_obj.modifiers.new(mod_name, type="BOOLEAN")
-                mod.operation = "INTERSECT"
-                mod.object = boundingbox
-                context.view_layer.objects.active = board_obj
-                bpy.ops.object.modifier_apply(modifier=mod_name)
+                self.cut_object(context, board_obj, boundingbox, "INTERSECT")
+
+                # get rid of the bounding box if it got merged into the board for some reason
+                bm = bmesh.new()
+                bm.from_mesh(board_obj.data)
+                for bb_vert in boundingbox.data.vertices:
+                    for vert in bm.verts[:]:
+                        if (bb_vert.co - vert.co).length_squared < 1e-8:
+                            bm.verts.remove(vert)
+                bm.to_mesh(board_obj.data)
+                bm.free()
+
                 bpy.data.objects.remove(boundingbox)
 
                 offset = 0.001 * board.bounds[0].to_3d()
@@ -482,18 +488,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     @classmethod
     def enhance_pcb_layers(cls, context, layers):
         for side, direction in reversed(list(zip(("F", "B"), (1, -1)))):
-            mask = layers[f"{side}.Mask"]
-            copper = layers[f"{side}.Cu"]
-            silk = layers[f"{side}.Silk"]
+            mask = layers[f"{side}_Mask"]
+            copper = layers[f"{side}_Cu"]
+            silk = layers[f"{side}_Silk"]
 
             # split copper layer into tracks and pads
 
             tracks = copper
             pads = cls.copy_object(copper, context.collection)
-            layers[f"{side}.Pads"] = pads
+            layers[f"{side}_Pads"] = pads
 
             mask_cutter = cls.copy_object(mask, context.collection)
-            cls.extrude_mesh_z(mask_cutter.data, 5e-4, True)
+            cls.extrude_mesh_z(mask_cutter.data, 1e-3, True)
             cls.cut_object(context, tracks, mask_cutter, "INTERSECT")
             cls.cut_object(context, pads, mask_cutter, "DIFFERENCE")
             bpy.data.objects.remove(mask_cutter)
@@ -501,7 +507,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             # remove silkscreen on pads
 
             pads_cutter = cls.copy_object(pads, context.collection)
-            cls.extrude_mesh_z(pads_cutter.data, 5e-4, True)
+            cls.extrude_mesh_z(pads_cutter.data, 1e-3, True)
             cls.cut_object(context, silk, pads_cutter, "DIFFERENCE")
             bpy.data.objects.remove(pads_cutter)
 
