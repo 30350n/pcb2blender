@@ -4,6 +4,7 @@ from .custom_node_utils import *
 
 import bpy
 from bpy.props import EnumProperty
+from bpy.types import ShaderNodeCustomGroup
 
 from nodeitems_utils import NodeItem
 from nodeitems_builtins import ShaderNodeCategory
@@ -62,7 +63,7 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
             "mat_base": "PCB", "mat_color": "PCB_YELLOW"}, {}),
         "exposed_copper": ("ShaderNodeBsdfMat4cad", {"location": (-400, 0),
             "mat_base": "METAL", "mat_color": "COPPER", "mat_variant": "GLOSSY"}, {}),
-        "solder_mask": ("ShaderNodeSolderMaskShader", {"location": (-660, 0)},
+        "solder_mask": ("ShaderNodePcbSolderMaskShader", {"location": (-660, 0)},
             {"F_Cu": ("seperate_cu", "R"), "B_Cu": ("seperate_cu", "G")}),
         "silkscreen": ("ShaderNodeBsdfMat4cad", {"location": (-860, 0),
             "mat_base": "PLASTIC", "mat_color": "PURE_WHITE", "mat_variant": "GLOSSY"}, {}),
@@ -86,7 +87,7 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
 
     setup_node_tree(node_tree, nodes)
 
-class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
+class ShaderNodePcbSolderMaskShader(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 200
 
@@ -177,7 +178,7 @@ class ShaderNodeSolderMaskShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCus
     def draw_buttons(self, context, layout):
         layout.prop(self, "soldermask", text="")
 
-class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGroup):
+class ShaderNodePcbShader(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "PCB Shader"
     bl_width_default = 140
 
@@ -246,13 +247,13 @@ class ShaderNodePcbShader(CustomNodetreeNodeBase, bpy.types.ShaderNodeCustomGrou
 
 shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", items=(
     NodeItem("ShaderNodeBsdfMat4cad"),
-    NodeItem("ShaderNodeSolderMaskShader"),
+    NodeItem("ShaderNodePcbSolderMaskShader"),
     NodeItem("ShaderNodePcbShader"),
 ))
 
 classes = (
     ShaderNodeBsdfMat4cad,
-    ShaderNodeSolderMaskShader,
+    ShaderNodePcbSolderMaskShader,
     ShaderNodePcbShader,
 )
 
