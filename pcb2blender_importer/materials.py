@@ -145,7 +145,7 @@ class ShaderNodeBsdfPcbSurfaceFinish(CustomNodetreeNodeBase, ShaderNodeCustomGro
             "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
                 {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-5, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Metallic": 1.0,
                 "Roughness": ("roughness", 0), "Normal": ("bevel", "Normal")}),
@@ -210,7 +210,7 @@ class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
             "Light Color": ("NodeSocketColor",  {}),
             "Dark Color":  ("NodeSocketColor",  {}),
             "Roughness":   ("NodeSocketFloat",  {}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
+            "Texture Strength": ("NodeSocketFloat", {"default_value": 0.5}),
             "Normal": ("NodeSocketVector", {"hide_value": True}),
             "F_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
             "B_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
@@ -282,7 +282,7 @@ class ShaderNodeBsdfPcbSilkscreen(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
                 roughness = 0.1
             case "BLACK":
                 color = hex2rgb("100f0f")
-                roughness = 0.3
+                roughness = 0.2
 
         if not self.silkscreen == "CUSTOM":
             self.inputs["Color"].default_value = (*srgb2lin(color), 1.0)
@@ -311,12 +311,12 @@ class ShaderNodeBsdfPcbSilkscreen(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
             "noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
                 "Scale": 4000.0, "Detail": 0.0, "Distortion": 0.1}),
             "bump_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Texture Strength"), 1: 0.05}),
+                {0: ("inputs", "Texture Strength"), 1: 0.025}),
             "bump": ("ShaderNodeBump", {}, {
                 "Strength": ("bump_strength", 0), "Distance": 1e-3,
                 "Height": ("noise", 0), "Normal": ("inputs", "Normal")}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-5, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
                 "Clearcoat": 0.75, "Normal": ("bevel", "Normal")}),
@@ -367,7 +367,7 @@ class ShaderNodeBsdfPcbBoardEdge(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "ssr": ("ShaderNodeBrightContrast", {},
                 {"Color": ("color", 0), "Bright": 0.1}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
                 "Subsurface": 0.001, "Subsurface Radius": ("ssr", 0),
@@ -408,7 +408,7 @@ class ShaderNodeBsdfSolder(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "roughness": ("ShaderNodeMapRange", {},
                 {"Value": ("noise_scaled", 0), "To Min": -0.15, "To Max": 0.15}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Metallic": 1.0,
                 "Roughness": ("roughness", 0), "Normal": ("bevel", "Normal")}),
