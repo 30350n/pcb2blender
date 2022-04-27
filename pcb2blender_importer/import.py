@@ -212,13 +212,25 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
 
                 # get rid of the bounding box if it got merged into the board for some reason
+                # also reapply board edge vcs on the newly cut edge faces
                 bm = bmesh.new()
                 bm.from_mesh(board_obj.data)
+
                 for bb_vert in boundingbox.data.vertices:
                     for vert in reversed(bm.verts[:]):
                         if (bb_vert.co - vert.co).length_squared < 1e-8:
                             bm.verts.remove(vert)
                             break
+
+                board_edge = bm.loops.layers.color[0]
+                for bb_face in boundingbox.data.polygons:
+                    point = boundingbox.data.vertices[bb_face.vertices[0]].co
+                    board_faces = (face for face in bm.faces if face.material_index == 0)
+                    faces = self.get_overlapping_faces(board_faces, point, bb_face.normal)
+                    for face in faces:
+                        for loop in face.loops:
+                            loop[board_edge] = (1, 1, 1, 1)
+
                 bm.to_mesh(board_obj.data)
                 bm.free()
 
@@ -569,6 +581,23 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         obj.data.transform(matrix)
         for child in obj.children:
             child.matrix_basis = matrix @ child.matrix_basis
+
+    @staticmethod
+    def get_overlapping_faces(bm_faces, point, normal):
+        overlapping_faces = []
+        for face in bm_faces:
+            if (1.0 - normal.dot(face.normal)) > 1e-4:
+                continue
+
+            direction = point - face.verts[0].co
+            distance = abs(
+                direction.normalized().dot(face.normal) * direction.length)
+            if distance > 1e-4:
+                continue
+
+            overlapping_faces.append(face)
+
+        return overlapping_faces
 
     def draw(self, context):
         layout = self.layout
