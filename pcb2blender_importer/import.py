@@ -215,9 +215,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 bm = bmesh.new()
                 bm.from_mesh(board_obj.data)
                 for bb_vert in boundingbox.data.vertices:
-                    for vert in bm.verts[:]:
+                    for vert in reversed(bm.verts[:]):
                         if (bb_vert.co - vert.co).length_squared < 1e-8:
                             bm.verts.remove(vert)
+                            break
                 bm.to_mesh(board_obj.data)
                 bm.free()
 
