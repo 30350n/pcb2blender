@@ -578,12 +578,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layout.split()
         layout.prop(self, "merge_materials")
         layout.prop(self, "enhance_materials")
-        layout.prop(self, "pcb_material")
         layout.split()
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
         layout.split()
-        layout.prop(self, "texture_dpi", slider=True)
+
+        layout.label(text="PCB Material")
+        layout.prop(self, "pcb_material", text="")
+        if self.pcb_material == "RASTERIZED":
+            layout.prop(self, "texture_dpi", slider=True)
 
         if has_svg2blender():
             layout.split()
