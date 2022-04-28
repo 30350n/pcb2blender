@@ -51,9 +51,9 @@ class SettingsDialog(wx.Dialog):
         text_detected = wx.StaticText(panel, label=f"Detected {len(boarddefs)} PCBs.")
         info.Add(text_detected, flag=wx.ALL, border=5)
 
-        for boarddef in boarddefs.values():
-            label = f"PCB {boarddef.name}"\
-                f"({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
+        for name, boarddef in sorted(boarddefs.items()):
+            label = f"PCB {name}"\
+                f" ({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
             if boarddef.stacked_boards:
                 label += " with "
                 for stacked in boarddef.stacked_boards:
@@ -76,6 +76,21 @@ class SettingsDialog(wx.Dialog):
                 warning.Add(wx.StaticText(panel, label="    " + name), flag=wx.ALL, border=5)
 
             rows.Add(warning, flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, border=5)
+
+        hint = wx.StaticBoxSizer(wx.StaticBox(panel, label="Hint"), orient=wx.VERTICAL)
+        boarddef_hint = ""\
+            "To define a board, specify its bounds by placing a Text Item with the text "\
+            "PCB3D_TL_<boardname> at its top left corner and one with "\
+            "PCB3D_BR_<boardname> at its bottom right corner.\n\n"\
+            "To stack a board A to another board B, add a Text Item with the text "\
+            "PCB3D_STACK_<boardnameA>_ONTO_<boardnameB>_<zoffset>\n"\
+            "at the location (relative to the top left corner of board B), "\
+            "where you want the top left corner of A to be.\n"\
+            "(zoffset is given in mm, 10.0 works great for 2.54mm headers and sockets)"
+        boarddef_hint_text = wx.StaticText(panel, label=boarddef_hint)
+        boarddef_hint_text.Wrap(400) #rows.GetSize().x
+        hint.Add(boarddef_hint_text, flag=wx.ALL, border=5)
+        rows.Add(hint, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=5)
 
         buttons = wx.BoxSizer()
         button_cancel = wx.Button(panel, id=wx.ID_CANCEL, label="Cancel", size=(85, 26))
