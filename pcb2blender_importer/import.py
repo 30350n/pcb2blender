@@ -44,13 +44,13 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     
     merge_materials:   BoolProperty(name="Merge Materials", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-    pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
-        items=(("RASTERIZED", "Rasterized", ""), ("3D", "3D", "")))
 
     cut_boards:        BoolProperty(name="Cut PCBs", default=True)
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
-    texture_dpi:       FloatProperty(name="Texture DPI", default=2032.0, soft_min=508.0, soft_max=4064.0)
+    pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
+        items=(("RASTERIZED", "Rasterized", ""), ("3D", "3D", "")))
+    texture_dpi:       FloatProperty(name="Texture DPI", default=1016.0, soft_min=508.0, soft_max=2032.0)
 
     import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
