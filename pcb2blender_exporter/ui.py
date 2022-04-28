@@ -52,12 +52,14 @@ class SettingsDialog(wx.Dialog):
         info.Add(text_detected, flag=wx.ALL, border=5)
 
         for boarddef in boarddefs.values():
-            label = f"PCB {boarddef.name} ({boarddef.bounds[2]}x{boarddef.bounds[3]}mm)"
+            label = f"PCB {boarddef.name}"\
+                f"({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
             if boarddef.stacked_boards:
                 label += " with "
                 for stacked in boarddef.stacked_boards:
                     label += "front panel" if stacked.name == "FPNL" else stacked.name
-                    label += f" stacked at ({', '.join(str(f) for f in stacked.offset)}), "
+                    stack_str = ", ".join(f"{f:.2f}" for f in stacked.offset)
+                    label += f" stacked at ({stack_str}), "
                 label = label[:-2] + "."
 
             info.Add(wx.StaticText(panel, label=label), flag=wx.ALL, border=5)
