@@ -26,16 +26,36 @@ def enhance_materials(materials):
 
         if mat4cad_mat := Material.from_name(material.name):
             pass
-        elif material.name == "PIN-01":
-            mat4cad_mat = Material.from_name("special-pins_silver-default")
-        elif material.name == "PIN-02":
-            mat4cad_mat = Material.from_name("special-pins_gold-default")
-        elif material.name == "IC-BODY-EPOXY-04":
-            mat4cad_mat = Material.from_name("plastic-traffic_black-matte")
-        elif material.name == "IC-LABEL-01":
-            mat4cad_mat = Material.from_name("plastic-grey_white-semi_matte")
         else:
-            continue
+            match material.name:
+                case "PIN-01":
+                    mat4cad_name = "special-pins_silver-default"
+                case "PIN-02":
+                    mat4cad_name = "special-pins_gold-default"
+                case "IC-BODY-EPOXY-04":
+                    mat4cad_name = "plastic-traffic_black-matte"
+                case "IC-LABEL-01":
+                    mat4cad_name = "plastic-grey_white-semi_matte"
+                case "RES-THT-01":
+                    mat4cad_name = "plastic-beige-semi_matte"
+                case "GLASS-13":
+                    mat4cad_name = "plastic_transparent-turquoise_blue-diffused"
+                case "LED-RED":
+                    mat4cad_name = "plastic_transparent-orient_red-diffused"
+                case "MET-BRONZE":
+                    mat4cad_name = "metal-bronze-semi_matte"
+                case "PLASTIC-BLUE-01":
+                    mat4cad_name = "plastic-brilliant_blue-semi_matte"
+                case "PLASTIC-ORANGE-01":
+                    mat4cad_name = "plastic-saffron_yellow-semi_matte"
+                case "PLASTIC-WHITE-01":
+                    mat4cad_name = "plastic-pure_white-semi_matte"
+                case "PLASTIC-YELLOW-01":
+                    mat4cad_name = "plastic-zinc_yellow-semi_matte"
+                case _:
+                    continue
+
+            mat4cad_mat = Material.from_name(mat4cad_name)
 
         mat4cad_mat.setup_node_tree(material.node_tree)
 
@@ -210,7 +230,7 @@ class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
             "Light Color": ("NodeSocketColor",  {}),
             "Dark Color":  ("NodeSocketColor",  {}),
             "Roughness":   ("NodeSocketFloat",  {}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 0.5}),
+            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
             "Normal": ("NodeSocketVector", {"hide_value": True}),
             "F_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
             "B_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
