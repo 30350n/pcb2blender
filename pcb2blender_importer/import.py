@@ -108,7 +108,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # rasterize/import layer svgs
 
-        if self.pcb_material == "RASTERIZED":
+        if self.pcb_material == "RASTERIZED" and self.enhance_materials:
             for layer in INCLUDED_LAYERS:
                 svg_path = str(tempdir / LAYERS / f"{layer}.svg")
                 png_path = str(tempdir / LAYERS / f"{layer}.png")
@@ -168,7 +168,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         pcb_meshes = {obj.data for obj in pcb_objects if obj.type == "MESH"}
 
-        if self.pcb_material == "3D":
+        if self.pcb_material == "RASTERIZED" and self.enhance_materials:
+            for obj in pcb_objects[1:]:
+                bpy.data.objects.remove(obj)
+            pcb_object = pcb_objects[0]
+
+            pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
+
+            board_material = pcb_object.data.materials[0]
+            setup_pcb_material(board_material.node_tree, images)
+        else:
             if can_enhance:
                 self.enhance_pcb_layers(context, layers)
                 pcb_objects = list(layers.values())
@@ -180,20 +189,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             context.view_layer.objects.active = pcb_object
             bpy.ops.object.join()
             bpy.ops.object.transform_apply()
-
-        else:
-            for obj in pcb_objects[1:]:
-                bpy.data.objects.remove(obj)
-            pcb_object = pcb_objects[0]
-
-            pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
-
-            board_material = pcb_object.data.materials[0]
-            setup_pcb_material(board_material.node_tree, images)
-
-            bpy.ops.object.select_all(action="DESELECT")
-            pcb_object.select_set(True)
-            context.view_layer.objects.active = pcb_object
 
         for mesh in pcb_meshes:
             if not mesh.users:
@@ -259,7 +254,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
 
-                if pcb.boards:
+                if pcb.boards and self.cut_boards:
                     partial_matches = []
                     for board in pcb.boards.values():
                         x, y = instance.location.xy * 1000
@@ -322,6 +317,11 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
                         continue
 
+                    if not pcb.boards[name].obj:
+                        self.warning(
+                            f"ignoring stacked board \"{name}\" (cut_boards is set to False)")
+                        continue
+
                     stacked_obj = pcb.boards[name].obj
                     stacked_obj.parent = board.obj
 
@@ -332,12 +332,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # select pcb objects and make one active
 
-        if pcb.boards:
-            bpy.ops.object.select_all(action="DESELECT")
+        bpy.ops.object.select_all(action="DESELECT")
+        if pcb.boards and self.cut_boards:
             top_level_boards = [board for board in pcb.boards.values() if not board.obj.parent]
             context.view_layer.objects.active = top_level_boards[0].obj
             for board in top_level_boards:
                 board.obj.select_set(True)
+        else:
+            pcb_object.select_set(True)
+            context.view_layer.objects.active = pcb_object
 
         # center pcbs
 
@@ -604,17 +607,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layout.prop(self, "import_components")
         layout.prop(self, "center_pcb")
         layout.split()
-        layout.prop(self, "merge_materials")
-        layout.prop(self, "enhance_materials")
-        layout.split()
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
         layout.split()
 
-        layout.label(text="PCB Material")
-        layout.prop(self, "pcb_material", text="")
+        layout.prop(self, "merge_materials")
+        layout.prop(self, "enhance_materials")
+        col = layout.column()
+        col.enabled = self.enhance_materials
+        col.label(text="PCB Material")
+        col.prop(self, "pcb_material", text="")
         if self.pcb_material == "RASTERIZED":
-            layout.prop(self, "texture_dpi", slider=True)
+            col.prop(self, "texture_dpi", slider=True)
 
         if has_svg2blender():
             layout.split()
