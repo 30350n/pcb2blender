@@ -236,7 +236,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 bpy.data.objects.remove(boundingbox)
 
-                offset = 0.001 * board.bounds[0].to_3d()
+                offset = M_TO_MM * board.bounds[0].to_3d()
                 board_obj.data.transform(Matrix.Translation(-offset))
                 board_obj.location = offset
 
@@ -269,14 +269,14 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         in_bounds_y = y <= p_min.y and y > p_max.y
                         if in_bounds_x and in_bounds_y:
                             instance.parent = board.obj
-                            instance.location -= p_min.to_3d() * 0.001
+                            instance.location.xy -= p_min * M_TO_MM
                             break
                         elif in_bounds_x or in_bounds_y:
-                            partial_matches.append((board.obj, p_min.to_3d() * 0.001))
+                            partial_matches.append((board.obj, p_min * M_TO_MM))
                     else:
                         if len(partial_matches) == 1:
                             instance.parent = partial_matches[0][0]
-                            instance.location -= partial_matches[0][1]
+                            instance.location.xy -= partial_matches[0][1]
                             continue
 
                         closest = None
@@ -290,7 +290,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                         name, board = closest
                         instance.parent = board.obj
-                        instance.location -= board.bounds[0].to_3d() * 0.001
+                        instance.location.xy -= board.bounds[0] * M_TO_MM
                         self.warning(
                             f"assigning component \"{component.name}\" (out of bounds) " \
                             f"to closest board \"{name}\""
@@ -328,7 +328,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
                     if name == "FPNL":
                         pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS) * 0.5
-                    stacked_obj.location = (offset + pcb_offset) * 0.001
+                    stacked_obj.location = (offset + pcb_offset) * M_TO_MM
 
         # select pcb objects and make one active
 
@@ -342,15 +342,14 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         # center pcbs
 
         if self.center_pcb:
-            if pcb.boards:
+            if pcb.boards and self.cut_boards:
                 center = Vector((0, 0))
                 for board in top_level_boards:
-                    center += (board.bounds[0] + board.bounds[1]) * 0.5 * 0.001
+                    center += (board.bounds[0] + board.bounds[1]) * 0.5
                 center /= len(top_level_boards)
 
-                matrix = Matrix.Translation(-center.to_3d())
                 for board in top_level_boards:
-                    self.apply_transformation(board.obj, matrix)
+                    board.obj.location.xy = (board.bounds[0] - center) * M_TO_MM
             else:
                 center = Vector(pcb_object.bound_box[0]) + pcb_object.dimensions * 0.5
                 matrix = Matrix.Translation(-center)
@@ -437,8 +436,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         margin = 0.01
 
         size = Vector((1.0, -1.0, 1.0)) * (bounds[1] - bounds[0]).to_3d()
-        scale = 0.001 * (size + 2.0 * Vector((margin, margin, 5.0)))
-        translation = 0.001 * (bounds[0] - Vector.Fill(2, margin)).to_3d()
+        scale = M_TO_MM * (size + 2.0 * Vector((margin, margin, 5.0)))
+        translation = M_TO_MM * (bounds[0] - Vector.Fill(2, margin)).to_3d()
         matrix_scale = Matrix.Diagonal(scale).to_4x4()
         matrix_offset = Matrix.Translation(translation)
         bounds_matrix = matrix_offset @ matrix_scale @ Matrix.Translation((0.5, -0.5, 0))
@@ -678,6 +677,8 @@ PCB2_LAYER_NAMES = (
     "B_Silk",
 )
 
+M_TO_MM = 1e-3
+
 MATRIX_FIX_SCALE = Matrix.Scale(2.54e-3, 4)
 MATRIX_FIX_SCALE_INV = MATRIX_FIX_SCALE.inverted()
 
@@ -731,7 +732,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     join:              BoolProperty(name="Join Shapes", default=True)
     tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-    scale:             FloatProperty(name="Scale", default=0.001)
+    scale:             FloatProperty(name="Scale", default=M_TO_MM)
 
     def execute(self, context):
         bpy.ops.object.select_all(action='DESELECT')
