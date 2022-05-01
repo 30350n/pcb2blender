@@ -473,7 +473,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     @staticmethod
     def improve_board_mesh(mesh):
         # fill holes in board mesh to make subsurface shading work
-        # create vertex color layer for board edge
+        # create vertex color layer for board edge and through holes
 
         bm = bmesh.new()
         bm.from_mesh(mesh)
@@ -495,7 +495,13 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             except ValueError:
                 pass
 
-        bmesh.ops.holes_fill(bm, edges=bm.edges[:])
+        filled = bmesh.ops.holes_fill(bm, edges=bm.edges[:])
+
+        through_holes = bm.loops.layers.color.new("Through Holes")
+        for face in bm.faces:
+            color = (1, 1, 1, 1) if face in filled["faces"] else (0, 0, 0, 1)
+            for loop in face.loops:
+                loop[through_holes] = color
 
         bm.to_mesh(mesh)
         bm.free()
