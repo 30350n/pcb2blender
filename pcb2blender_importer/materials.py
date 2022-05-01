@@ -38,12 +38,22 @@ def enhance_materials(materials):
                     mat4cad_name = "plastic-grey_white-semi_matte"
                 case "RES-THT-01":
                     mat4cad_name = "plastic-beige-semi_matte"
+                case "RES-SMD-01":
+                    mat4cad_name = "plastic-iron_grey-semi_matte"
+                case "CAP-CERAMIC-05":
+                    mat4cad_name = "plastic-signal_grey-semi_matte"
+                case "CAP-CERAMIC-06":
+                    mat4cad_name = "plastic-grey_beige-semi_matte"
+                case "BOARD-BLACK-03":
+                    mat4cad_name = "plastic-mouse_grey-semi_matte"
                 case "GLASS-13":
                     mat4cad_name = "plastic_transparent-turquoise_blue-diffused"
                 case "LED-RED":
                     mat4cad_name = "plastic_transparent-orient_red-diffused"
                 case "MET-BRONZE":
                     mat4cad_name = "metal-bronze-semi_matte"
+                case "MET-COPPER":
+                    mat4cad_name = "metal-copper-semi_matte"
                 case "PLASTIC-BLUE-01":
                     mat4cad_name = "plastic-brilliant_blue-semi_matte"
                 case "PLASTIC-ORANGE-01":
@@ -52,6 +62,10 @@ def enhance_materials(materials):
                     mat4cad_name = "plastic-pure_white-semi_matte"
                 case "PLASTIC-YELLOW-01":
                     mat4cad_name = "plastic-zinc_yellow-semi_matte"
+                case "PLASTIC-GREEN-01":
+                    mat4cad_name = "plastic-pale_green-semi_matte"
+                case "RED-BODY":
+                    mat4cad_name = "plastic-salmon_orange-semi_matte"
                 case _:
                     continue
 
