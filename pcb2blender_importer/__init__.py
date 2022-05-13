@@ -10,7 +10,6 @@ bl_info = {
     "wiki_url": "https://github.com/30350n/pcb2blender",
 }
 
-import bpy
 import importlib, subprocess, sys
 from pathlib import Path
 
