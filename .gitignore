@@ -1,3 +1,5 @@
 .vscode/
 __pycache__/
 site-packages/
+images/template*
+*.blend[1-9]
