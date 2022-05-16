@@ -1,4 +1,5 @@
-import pcbnew, wx, os
+import pcbnew, wx
+from pathlib import Path
 
 from .ui import SettingsDialog
 from .export import export_pcb3d, get_boarddefs
@@ -8,7 +9,7 @@ class Pcb2BlenderExporter(pcbnew.ActionPlugin):
         self.name = "Export to Blender (.pcb3d)"
         self.category = "Export"
         self.show_toolbar_button = True
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), "blender_icon_32x32.png")
+        self.icon_file_name = Path(__file__).parent / "images/" "blender_icon_32x32.png"
         self.description = "Export 3D Model to Blender."
 
     def Run(self):

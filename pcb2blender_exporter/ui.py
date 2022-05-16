@@ -1,4 +1,5 @@
-import wx, os
+import wx
+from pathlib import Path
 
 class SettingsDialog(wx.Dialog):
     def __init__(self, parent, boarddefs, ignored):
@@ -14,8 +15,8 @@ class SettingsDialog(wx.Dialog):
         self.Show()
 
     def on_export(self, event):
-        path = self.file_picker.GetPath()
-        if os.path.exists(os.path.dirname(path)):
+        path = Path(self.file_picker.GetPath())
+        if path.exists() and path.parent.exists():
             self.EndModal(wx.OK)
         else:
             wx.MessageBox(
