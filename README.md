@@ -29,7 +29,7 @@ them, after last minute board revisions.
 
 ### Exporter (KiCad)
 
-- (not available yet) via the builtin plugin manager
+- (not available yet) via the builtin plugin manager<br>
   `Tools -> Plugin and Content Manager -> Plugins -> pcb2blender`
 
 - (manual) Download the `pcb2blender_exporter.zip` from the
@@ -42,8 +42,9 @@ them, after last minute board revisions.
 
 - (manual) Download the `pcb2blender_importer.zip` from the
   [latest release](https://github.com/30350n/free2ki/releases/latest)
-  and install it in Blender via `Edit -> Preferences -> Add-ons -> Install`.
-  (You need to install the actual zip file. Don't unpack it!)
+  and install it in Blender via<br>
+  `Edit -> Preferences -> Add-ons -> Install`.<br>
+  (You need to install the actual zip file, don't unpack it!)
 
 ## Other Projects
 
