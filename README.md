@@ -14,14 +14,10 @@ skipping all the boring cleanup work that would be required without it.
 Its quick export/import times also make it viable to create renders of WIP boards or to update
 them, after last minute board revisions.
 
-<div style="display:flex">
-     <div style="flex:1;padding:5px;">
-          <img src="images/pcb_material.jpg" width=100%/>
-     </div>
-     <div style="flex:1;padding:5px;">
-          <img src="images/breakout.jpg" width=100%/>
-     </div>
-</div>
+<table><tr>
+     <td><img src="images/pcb_material.jpg"/></td>
+     <td><img src="images/breakout.jpg"/></td>
+</tr></table>
 
 ## Usage
 
