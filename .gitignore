@@ -3,3 +3,4 @@ __pycache__/
 site-packages/
 images/template*
 *.blend[1-9]
+release/
