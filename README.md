@@ -33,7 +33,7 @@ them, after last minute board revisions.
   `Tools -> Plugin and Content Manager -> Plugins -> pcb2blender`
 
 - (manual) Download the `pcb2blender_exporter.zip` from the
-  [latest release](https://github.com/30350n/free2ki/releases/latest),
+  [latest release](https://github.com/30350n/pcb2blender/releases/latest),
   unpack the `plugins` directory from it into your
   [Kicad Plugin directory](https://dev-docs.kicad.org/en/python/pcbnew/) and rename it to
   `pcb2blender_exporter`.
@@ -41,7 +41,7 @@ them, after last minute board revisions.
 ### Importer (Blender)
 
 - (manual) Download the `pcb2blender_importer.zip` from the
-  [latest release](https://github.com/30350n/free2ki/releases/latest)
+  [latest release](https://github.com/30350n/pcb2blender/releases/latest)
   and install it in Blender via<br>
   `Edit -> Preferences -> Add-ons -> Install`.<br>
   (You need to install the actual zip file, don't unpack it!)
@@ -68,4 +68,4 @@ them, after last minute board revisions.
 ## License
 
 - This project is licensed under
-  [GPLv3](https://github.com/30350n/free2ki/blob/master/LICENSE).
+  [GPLv3](https://github.com/30350n/pcb2blender/blob/master/LICENSE).
