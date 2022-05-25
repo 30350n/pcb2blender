@@ -96,7 +96,11 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
 
     for tag in tags[1:]:
         url = f"{ORIGIN}/releases/download/{tag.name}/version.json"
-        metadata["versions"].append(requests.get(url).json())
+        result = requests.get(url)
+        if result.ok:
+            metadata["versions"].append(result.json())
+        else:
+            print(f"skipping {tag.name}, missing version.json")
 
     metadata_json = json.dumps(metadata, indent=4)
     (metadata_dir / "metadata.json").write_text(metadata_json)
