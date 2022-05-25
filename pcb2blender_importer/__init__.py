@@ -2,7 +2,7 @@ bl_info = {
     "name": "pcb2blender importer",
     "description": "Enables Blender to import .pcb3d files, exported from KiCad.",
     "author": "Bobbe",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (3, 1, 0),
     "location": "File > Import",
     "category": "Import-Export",

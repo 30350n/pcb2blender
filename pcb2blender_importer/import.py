@@ -132,6 +132,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 image = bpy.data.images.load(str(png_path))
                 image.colorspace_settings.name = "Non-Color"
                 image.pack()
+                image.filepath = ""
 
                 images[layer] = image
 
@@ -303,8 +304,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     bevel_depth=self.fpnl_bevel_depth,
                     setup_camera=self.fpnl_setup_camera
                 )
-
-                pcb.boards["FPNL"] = [(Vector((0, 0)), None), [], context.object]
+                pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object)
             else:
                 self.warning(f"frontpanel file \"{filepath}\" does not exist")
         
@@ -810,7 +810,7 @@ class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
 
 def has_svg2blender():
-    return addon_utils.check("svg2blender-importer") == (True, True)
+    return addon_utils.check("svg2blender_importer") == (True, True)
 
 def menu_func_import_pcb3d(self, context):
     self.layout.operator(PCB2BLENDER_OT_import_pcb3d.bl_idname, text="PCB (.pcb3d)")
