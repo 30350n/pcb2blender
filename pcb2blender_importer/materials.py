@@ -12,12 +12,15 @@ from nodeitems_utils import NodeItem
 from nodeitems_builtins import ShaderNodeCategory
 
 def merge_materials(meshes):
+    merged_materials = {}
     for mesh in meshes:
         for i, material in enumerate(mesh.materials):
-            if (material.name[-4] == "."
-                    and material.name[-3:].isdecimal()
-                    and material.name[:-4] in bpy.data.materials):
-                mesh.materials[i] = bpy.data.materials[material.name[:-4]]
+            name = material.name.rsplit(".", 1)[0]
+            if merged_material := merged_materials.get(name):
+                mesh.materials[i] = merged_material
+            else:
+                material.name = name
+                merged_materials[name] = material
 
 def enhance_materials(materials):
     for material in materials:
@@ -118,7 +121,7 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
             "Board Edge":     ("board_edge",     "BSDF"),
         }),
         "output": ("ShaderNodeOutputMaterial", {"location": (240, 0)},
-            {"Surface": ("shader", "Shader"), "Displacement": ("shader","Displacement")}),
+            {"Surface": ("shader", "Shader"), "Displacement": ("shader", "Displacement")}),
     }
 
     setup_node_tree(node_tree, nodes)
@@ -179,10 +182,10 @@ class ShaderNodeBsdfPcbSurfaceFinish(CustomNodetreeNodeBase, ShaderNodeCustomGro
             "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
                 {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Metallic": 1.0,
-                "Roughness": ("roughness", 0), "Normal": ("bevel", "Normal")}),
+                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -290,11 +293,11 @@ class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
             "bump": ("ShaderNodeBump", {}, {"Normal": ("inputs", "Normal"),
                 "Strength": ("strength", 0), "Distance": 1e-3, "Height": ("height", 0)}),
 
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("mix_color", 0), "Subsurface Color": ("mix_color", 0),
                 "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
-                "Roughness": ("inputs", "Roughness"), "Normal": ("bevel", "Normal")}),
+                "Roughness": ("inputs", "Roughness"), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -350,10 +353,10 @@ class ShaderNodeBsdfPcbSilkscreen(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
                 "Strength": ("bump_strength", 0), "Distance": 1e-3,
                 "Height": ("noise", 0), "Normal": ("inputs", "Normal")}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
-                "Clearcoat": 0.75, "Normal": ("bevel", "Normal")}),
+                "Clearcoat": 0.75, "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -401,11 +404,11 @@ class ShaderNodeBsdfPcbBoardEdge(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "ssr": ("ShaderNodeBrightContrast", {},
                 {"Color": ("color", 0), "Bright": 0.1}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
                 "Subsurface": 0.001, "Subsurface Radius": ("ssr", 0),
-                "Roughness": ("roughness", 0), "Normal": ("bevel", "Normal")}),
+                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -442,10 +445,10 @@ class ShaderNodeBsdfSolder(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "roughness": ("ShaderNodeMapRange", {},
                 {"Value": ("noise_scaled", 0), "To Min": -0.15, "To Max": 0.15}),
             
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", "Normal")}),
+            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Metallic": 1.0,
-                "Roughness": ("roughness", 0), "Normal": ("bevel", "Normal")}),
+                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
