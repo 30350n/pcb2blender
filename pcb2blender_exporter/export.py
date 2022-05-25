@@ -3,7 +3,7 @@ from pcbnew import PLOT_CONTROLLER as PlotController, PCB_PLOT_PARAMS, PLOT_FORM
 
 import tempfile, shutil, struct, re
 from pathlib import Path
-from zipfile import ZipFile, ZipInfo
+from zipfile import ZipFile, ZIP_DEFLATED
 from dataclasses import dataclass, field
 from xml.etree import ElementTree
 
@@ -48,7 +48,7 @@ def export_pcb3d(filepath, boarddefs):
     )
     export_layers(board, bounds, layers_path)
 
-    with ZipFile(filepath, mode="w") as file:
+    with ZipFile(filepath, mode="w", compression=ZIP_DEFLATED) as file:
         # always ensure the COMPONENTS, LAYERS and BOARDS directories are created
         file.writestr(COMPONENTS + "/", "")
         file.writestr(LAYERS + "/", "")
