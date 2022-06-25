@@ -16,21 +16,19 @@ class SettingsDialog(wx.Dialog):
 
     def on_export(self, event):
         path = Path(self.file_picker.GetPath())
-        if path.exists() and path.parent.exists():
+        if path.parent.exists():
             self.EndModal(wx.OK)
         else:
             wx.MessageBox(
-                f"Invalid path \"{path}\"!", caption="Error",
+                f"Invalid path \"{path.parent}\"!", caption="Error",
                 style=wx.CENTER|wx.ICON_ERROR|wx.OK
             )
 
     def init_panel(self, boarddefs, ignored):
         panel = wx.Panel(self)
-        
+
         rows = wx.BoxSizer(orient=wx.VERTICAL)
-
         settings = wx.StaticBoxSizer(wx.StaticBox(panel, label="Settings"), orient=wx.VERTICAL)
-
         column = wx.BoxSizer()
 
         text_export_as = wx.StaticText(panel, label="Export as")
@@ -72,7 +70,7 @@ class SettingsDialog(wx.Dialog):
                 wx.StaticBox(panel, label="Warning (failed to parse some identifiers)"),
                 orient=wx.VERTICAL
             )
-            
+
             for name in ignored:
                 warning.Add(wx.StaticText(panel, label="    " + name), flag=wx.ALL, border=5)
 
@@ -99,7 +97,7 @@ class SettingsDialog(wx.Dialog):
         button_export = wx.Button(panel, id=wx.ID_OK, label="Export", size=(85, 26))
         button_export.Bind(wx.EVT_BUTTON, self.on_export)
         buttons.Add(button_export, flag=wx.ALL|wx.ALIGN_CENTER, border=5)
-        
+
         rows.Add(buttons, flag=wx.ALL|wx.ALIGN_RIGHT, border=5)
 
         panel.SetSizer(rows)
