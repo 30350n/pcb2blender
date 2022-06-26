@@ -25,6 +25,10 @@ them, after last minute board revisions.
 2. Import the file in Blender via `File -> Import -> PCB (.pcb3d)`
 3. Start creating awesome renders!
 
+### Features
+
+### Advanced Features
+
 ## Installation
 
 ### Exporter (KiCad)
@@ -41,10 +45,11 @@ them, after last minute board revisions.
 ### Importer (Blender)
 
 - (manual) Download the `pcb2blender_importer.zip` from the
-  [latest release](https://github.com/30350n/pcb2blender/releases/latest)
-  and install it in Blender via<br>
-  `Edit -> Preferences -> Add-ons -> Install`.<br>
-  (You need to install the actual zip file, don't unpack it!)
+  [latest release](https://github.com/30350n/pcb2blender/releases/latest),
+  install it in Blender via<br>
+  `Edit -> Preferences -> Add-ons -> Install`<br>
+  (you need to install the actual zip file, don't unpack it!)
+  and enable it (enabling the addon for the first time will take a few minutes).
 
 ## Other Projects
 

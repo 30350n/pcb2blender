@@ -19,8 +19,9 @@ dependencies = {
 }
 module_names = ("import", "materials")
 
-dependency_path = str((Path(__file__).parent / "site-packages").resolve())
-sys.path.append(dependency_path)
+dependency_path = (Path(__file__).parent / "site-packages").resolve()
+dependency_path.mkdir(exist_ok=True)
+sys.path.append(str(dependency_path))
 
 missing = []
 for dependency, module_name in dependencies.items():
@@ -29,7 +30,7 @@ for dependency, module_name in dependencies.items():
 if missing:
     subprocess.check_call((
         sys.executable, "-m",
-        "pip", "install", *missing, "-t", dependency_path
+        "pip", "install", *missing, "-t", str(dependency_path)
     ))
 
 modules = []
