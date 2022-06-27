@@ -42,7 +42,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
     import_components: BoolProperty(name="Import Components", default=True)
     center_pcb:        BoolProperty(name="Center PCB", default=True)
-    
+
     merge_materials:   BoolProperty(name="Merge Materials", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
 
@@ -51,15 +51,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
     pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
         items=(("RASTERIZED", "Rasterized", ""), ("3D", "3D", "")))
-    texture_dpi:       FloatProperty(name="Texture DPI", default=1016.0, soft_min=508.0, soft_max=2032.0)
+    texture_dpi:       FloatProperty(name="Texture DPI",
+        default=1016.0, soft_min=508.0, soft_max=2032.0)
 
     import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
     fpnl_path:         StringProperty(name="", subtype="FILE_PATH",
         description="")
-    
-    fpnl_thickness:    FloatProperty(name="Panel Thickness (mm)", default=2.0, soft_min=0.0, soft_max=5.0)
-    fpnl_bevel_depth:  FloatProperty(name="Bevel Depth (mm)", default=0.05, soft_min=0.0, soft_max=0.25)
+
+    fpnl_thickness:    FloatProperty(name="Panel Thickness (mm)",
+        default=2.0, soft_min=0.0, soft_max=5.0)
+    fpnl_bevel_depth:  FloatProperty(name="Bevel Depth (mm)",
+        default=0.05, soft_min=0.0, soft_max=0.25)
     fpnl_setup_camera: BoolProperty(name="Setup Orthographic Camera", default=True)
 
     filter_glob:       StringProperty(default="*.pcb3d", options={"HIDDEN"})
@@ -304,9 +307,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object)
             else:
                 self.warning(f"frontpanel file \"{filepath}\" does not exist")
-        
+
         # stack boards
-        
+
         if self.stack_boards:
             for board in pcb.boards.values():
                 for (name, offset) in board.stacked_boards:
@@ -396,7 +399,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             bounds_path = board_dir / BOUNDS
             if not bounds_path.exists():
                 continue
-            
+
             try:
                 bounds = struct.unpack("!ffff", bounds_path.read_bytes())
             except struct.error:
