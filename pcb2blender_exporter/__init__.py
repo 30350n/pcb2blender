@@ -9,7 +9,8 @@ class Pcb2BlenderExporter(pcbnew.ActionPlugin):
         self.name = "Export to Blender (.pcb3d)"
         self.category = "Export"
         self.show_toolbar_button = True
-        self.icon_file_name = str(Path(__file__).parent / "images" / "blender_icon_32x32.png").encode("ascii", "ignore")
+        self.icon_file_name = (
+            Path(__file__).parent / "images" / "blender_icon_32x32.png").as_posix()
         self.description = "Export 3D Model to Blender."
 
     def Run(self):
