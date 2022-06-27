@@ -3,13 +3,14 @@ from bpy_extras.io_utils import ImportHelper, orientation_helper, axis_conversio
 from bpy.props import *
 from mathutils import Vector, Matrix
 
-import tempfile, random, shutil, re, struct, math
+import tempfile, random, shutil, re, struct, math, io
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
 from dataclasses import dataclass
 import numpy as np
 
-from cairosvg import svg2png
+from skia import SVGDOM, Stream, Surface, Color4f
+SKIA_MAGIC = 0.282222222
 from PIL import Image, ImageOps
 
 from .materials import setup_pcb_material, merge_materials, enhance_materials
@@ -109,23 +110,19 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         # rasterize/import layer svgs
 
         if self.pcb_material == "RASTERIZED" and self.enhance_materials:
-            for layer in INCLUDED_LAYERS:
-                svg_path = str(tempdir / LAYERS / f"{layer}.svg")
-                png_path = str(tempdir / LAYERS / f"{layer}.png")
-                svg2png(url=svg_path, write_to=png_path, dpi=self.texture_dpi, negate_colors=True)
-
+            layers_path = tempdir / LAYERS
+            dpi = self.texture_dpi
             images = {}
             for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
-                layer = f_layer[2:]
-                front = Image.open(tempdir / LAYERS / f"{f_layer}.png").getchannel("R")
-                back  = Image.open(tempdir / LAYERS / f"{b_layer}.png").getchannel("R")
-                empty = Image.new("L", front.size)
+                front = self.svg2img(layers_path / f"{f_layer}.svg", dpi).getchannel(0)
+                back  = self.svg2img(layers_path / f"{b_layer}.svg", dpi).getchannel(0)
 
-                if layer == "Mask":
+                if (layer := f_layer[2:]) != "Mask":
                     front = ImageOps.invert(front)
                     back  = ImageOps.invert(back)
+                    empty = Image.new("L", front.size)
 
-                png_path = tempdir / LAYERS / f"{layer}.png"
+                png_path = layers_path / f"{layer}.png"
                 merged = Image.merge("RGB", (front, back, empty))
                 merged.save(png_path)
 
@@ -607,6 +604,25 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         return overlapping_faces
 
+    @staticmethod
+    def svg2img(svg_path, dpi):
+        svg = SVGDOM.MakeFromStream(Stream.MakeFromFile(str(svg_path)))
+        width, height = svg.containerSize()
+        dpmm = dpi * INCH_TO_MM * SKIA_MAGIC
+        pixels_width, pixels_height = round(width * dpmm), round(height * dpmm)
+        surface = Surface(pixels_width, pixels_height)
+
+        with surface as canvas:
+            canvas.clear(Color4f.kWhite)
+            canvas.scale(pixels_width / width, pixels_height / height)
+            svg.render(canvas)
+
+        with io.BytesIO(surface.makeImageSnapshot().encodeToData()) as file:
+            image = Image.open(file)
+            image.load()
+
+        return image
+
     def draw(self, context):
         layout = self.layout
 
@@ -688,6 +704,7 @@ PCB2_LAYER_NAMES = (
 )
 
 M_TO_MM = 1e-3
+INCH_TO_MM = 1 / 25.4
 
 MATRIX_FIX_SCALE = Matrix.Scale(2.54e-3, 4)
 MATRIX_FIX_SCALE_INV = MATRIX_FIX_SCALE.inverted()

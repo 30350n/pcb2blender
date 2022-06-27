@@ -14,7 +14,7 @@ import importlib.util, subprocess, sys
 from pathlib import Path
 
 dependencies = {
-    "cairosvg": "cairosvg",
+    "skia-python": "skia",
     "pillow": "PIL",
 }
 module_names = ("import", "materials")
@@ -30,7 +30,7 @@ for dependency, module_name in dependencies.items():
 if missing:
     subprocess.check_call((
         sys.executable, "-m",
-        "pip", "install", *missing, "-t", str(dependency_path)
+        "pip", "install", "--no-deps", *missing, "-t", str(dependency_path)
     ))
 
 modules = []
