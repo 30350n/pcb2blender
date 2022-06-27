@@ -5,7 +5,6 @@ import tempfile, shutil, struct, re
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from dataclasses import dataclass, field
-from xml.etree import ElementTree
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -160,12 +159,12 @@ def export_layers(board, bounds, output_directory):
         plot_controller.ClosePlot()
         filepath = filepath.rename(filepath.parent / f"{layer}.svg")
 
-        svg = ElementTree.parse(filepath)
-        root = svg.getroot()
-        root.attrib["width"]  = f"{bounds[2] * 0.1:.6f}cm"
-        root.attrib["height"] = f"{bounds[3] * 0.1:.6f}cm"
-        root.attrib["viewBox"] = " ".join(str(round(v * 1e6)) for v in bounds)
-        svg.write(filepath)
+        content = filepath.read_text()
+        width  = f"{bounds[2] * 0.1:.6f}cm"
+        height = f"{bounds[3] * 0.1:.6f}cm"
+        viewBox = " ".join(str(round(v * 1e6)) for v in bounds)
+        content = svg_header_regex.sub(svg_header_sub.format(width, height, viewBox), content)
+        filepath.write_text(content)
 
 def sanitized(name):
     return re.sub("[\W]+", "_", name)
@@ -181,3 +180,8 @@ def init_tempdir():
     if tempdir.exists():
         shutil.rmtree(tempdir)
     tempdir.mkdir()
+
+svg_header_regex = re.compile(
+    r"<svg([^>]*)width=\"[^\"]*\"[^>]*height=\"[^\"]*\"[^>]*viewBox=\"[^\"]*\"[^>]*>"
+)
+svg_header_sub = "<svg\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
