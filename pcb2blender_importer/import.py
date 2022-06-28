@@ -787,6 +787,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         if self.join:
             meshes = {obj.data for obj in objects if obj.type == "MESH"}
             bpy.ops.object.join()
+            bpy.ops.object.transform_apply()
             for mesh in meshes:
                 if not mesh.users:
                     bpy.data.meshes.remove(mesh)
