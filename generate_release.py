@@ -5,7 +5,7 @@ from git import Repo
 from zipfile import ZipFile, ZIP_DEFLATED
 from hashlib import sha256
 from itertools import chain
-import json, shutil, requests
+import json, shutil, requests, re
 
 TARGET_DIRECTORY = Path("release")
 
@@ -112,6 +112,14 @@ def generate_blender_addon(path, extra_files=[]):
     latest_tag = tags[0]
     version, _, blender_version = latest_tag.name.split("-")
 
+    if version[1:] != (bl_info_version := get_bl_info_version(path)):
+        print(f"warning: tag addon version ({version[1:]}) doesn't match addon version "\
+            f"in bl_info ({bl_info_version})")
+
+    if blender_version[1:] != (bl_info_bversion := get_bl_info_bversion(path)):
+        print(f"warning: tag blender version ({version[1:]}) doesn't match blender version "\
+            f"in bl_info ({bl_info_bversion})")
+
     TARGET_DIRECTORY.mkdir(exist_ok=True)
     zip_path = TARGET_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
     with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
@@ -128,6 +136,17 @@ def generate_blender_addon(path, extra_files=[]):
 
     metadata_dir = TARGET_DIRECTORY / "metadata"
     metadata_dir.mkdir(exist_ok=True)
+
+def get_bl_info_version(path):
+    group = version_regex.match((path / "__init__.py").read_text()).groups()[0]
+    return ".".join(s.strip() for s in group.split(",")[:2])
+
+def get_bl_info_bversion(path):
+    group = bversion_regex.match((path / "__init__.py").read_text()).groups()[0]
+    return ".".join(s.strip() for s in group.split(",")[:2])
+
+version_regex  = re.compile(r"bl_info\s*=\s*{[^}]*\"version\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
+bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
 
 if __name__ == "__main__":
     generate_kicad_addon(
