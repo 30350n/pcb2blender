@@ -1,4 +1,4 @@
-from .mat4cad.core import Material, hex2rgb, srgb2lin
+from .mat4cad.core import Material, rgb2hex, hex2rgb, srgb2lin
 from .mat4cad.colors import PCB_YELLOW
 from .mat4cad.blender import ShaderNodeBsdfMat4cad
 from .custom_node_utils import *
@@ -16,11 +16,12 @@ def merge_materials(meshes):
     for mesh in meshes:
         for i, material in enumerate(mesh.materials):
             name = material.name.rsplit(".", 1)[0]
-            if merged_material := merged_materials.get(name):
+            color = rgb2hex(material.diffuse_color)
+            if merged_material := merged_materials.get((name, color)):
                 mesh.materials[i] = merged_material
             else:
                 material.name = name
-                merged_materials[name] = material
+                merged_materials[(name, color)] = material
 
 def enhance_materials(materials):
     for material in materials:
