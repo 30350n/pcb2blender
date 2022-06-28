@@ -775,7 +775,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         objects = list(set(bpy.data.objects).difference(objects_before))
 
         for obj in objects:
-            obj.scale *= self.scale
+            obj.matrix_world = Matrix.Scale(self.scale, 4) @ obj.matrix_world
             obj.select_set(True)
         context.view_layer.objects.active = objects[0]
 
