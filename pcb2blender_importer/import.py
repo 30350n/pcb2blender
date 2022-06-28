@@ -803,8 +803,13 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             bpy.ops.object.mode_set(mode="OBJECT")
 
         if self.enhance_materials:
+            materials = sum((obj.data.materials[:] for obj in objects), [])
             merge_materials([obj.data for obj in objects])
-            enhance_materials(sum((obj.data.materials[:] for obj in objects), []))
+            for material in materials[:]:
+                if not material.users:
+                    materials.remove(material)
+                    bpy.data.materials.remove(material)
+            enhance_materials(materials)
 
         return {"FINISHED"}
 
