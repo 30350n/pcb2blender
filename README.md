@@ -1,5 +1,5 @@
-[![blender](https://img.shields.io/badge/blender-3.2.0-orange)](https://www.gnu.org/licenses/gpl-3.0.txt)
-[![kicad](https://img.shields.io/badge/kicad-6.0.5-blue)](https://www.gnu.org/licenses/gpl-3.0.txt)
+[![blender](https://img.shields.io/badge/blender-3.2.0-orange)](https://www.blender.org/)
+[![kicad](https://img.shields.io/badge/kicad-6.0.5-blue)](https://www.kicad.org/)
 [![gplv3](https://img.shields.io/badge/license-GPLv3-lightgrey)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
 <img src="images/header.jpg"/>
@@ -56,9 +56,9 @@ them, after last minute board revisions.
 - The [protorack-kicad](https://github.com/30350n/protorack-kicad) KiCad library, contains
   all the custom symbols and footprints I use for eurorack module development.
 
-- My [svg2blender](https://github.com/30350n/svg2blender) workflow enables you to export
+- The [svg2blender](https://github.com/30350n/svg2blender) workflow enables you to export
   2D graphical designs from [Inkscape](https://inkscape.org/) to Blender. It's mainly intended
-  for use with front panel designs, but could be used for other ones as well.
+  for use with front panel designs, but could be used for other things as well.
 
 ## Credits
 
