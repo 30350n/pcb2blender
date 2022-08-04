@@ -142,10 +142,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         if self.import_components:
             for component in pcb.components:
                 bpy.ops.pcb2blender.import_x3d(
-                    filepath=str(tempdir / component), scale=1.0, enhance_materials=False)
+                    filepath=str(tempdir / component), enhance_materials=False)
                 obj = context.object
                 obj.data.name = component.rsplit("/", 1)[1].rsplit(".", 1)[0]
-                obj.data.transform(MATRIX_FIX_SCALE)
                 component_map[component] = obj.data
                 bpy.data.objects.remove(obj)
 
@@ -709,8 +708,8 @@ PCB2_LAYER_NAMES = (
 M_TO_MM = 1e-3
 INCH_TO_MM = 1 / 25.4
 
-MATRIX_FIX_SCALE = Matrix.Scale(2.54e-3, 4)
-MATRIX_FIX_SCALE_INV = MATRIX_FIX_SCALE.inverted()
+FIX_X3D_SCALE = M_TO_MM * 2.54
+MATRIX_FIX_SCALE_INV = Matrix.Scale(FIX_X3D_SCALE, 4).inverted()
 
 regex_filter_components = re.compile(
     r"(?P<prefix>Transform\s*{\s*"
@@ -762,7 +761,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     join:              BoolProperty(name="Join Shapes", default=True)
     tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-    scale:             FloatProperty(name="Scale", default=M_TO_MM)
+    scale:             FloatProperty(name="Scale", default=FIX_X3D_SCALE, precision=5)
 
     def execute(self, context):
         bpy.ops.object.select_all(action='DESELECT')
