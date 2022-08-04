@@ -785,7 +785,8 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
         if self.join:
             meshes = {obj.data for obj in objects if obj.type == "MESH"}
-            bpy.ops.object.join()
+            if len(objects) > 1:
+                bpy.ops.object.join()
             bpy.ops.object.transform_apply()
             for mesh in meshes:
                 if not mesh.users:
@@ -795,6 +796,8 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
             joined_obj.data.name = joined_obj.name
             objects = [joined_obj]
+        else:
+            bpy.ops.object.transform_apply(location=False, rotation=False)
 
         if self.tris_to_quads:
             bpy.ops.object.mode_set(mode="EDIT")
