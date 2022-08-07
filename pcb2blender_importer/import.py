@@ -756,7 +756,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     bl_options = {"PRESET", "UNDO"}
 
     filename_ext = ".x3d"
-    filter_glob: StringProperty(default="*.x3d;*.wrl", options={"HIDDEN"})
+    filter_glob: StringProperty(default="*.x3d;*.wrl;*.wrz", options={"HIDDEN"})
 
     join:              BoolProperty(name="Join Shapes", default=True)
     tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
