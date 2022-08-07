@@ -5,6 +5,7 @@ import tempfile, shutil, struct, re
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from dataclasses import dataclass, field
+from typing import List
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -23,13 +24,13 @@ SVG_MARGIN = 1.0 # mm
 @dataclass
 class StackedBoard:
     name: str
-    offset: list[float]
+    offset: List[float]
 
 @dataclass
 class BoardDef:
     name: str
-    bounds: list[float]
-    stacked_boards: list[StackedBoard] = field(default_factory=list)
+    bounds: List[float]
+    stacked_boards: List[StackedBoard] = field(default_factory=list)
 
 def export_pcb3d(filepath, boarddefs):
     init_tempdir()
