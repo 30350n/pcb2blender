@@ -9,11 +9,13 @@ import json, shutil, requests, re
 
 TARGET_DIRECTORY = Path("release")
 
-DESCRIPTION = """
+DESCRIPTION = re.sub(r"\n([^\n])", " \g<1>", """
 The pcb2blender workflow lets you create professionally looking product renders of all your
 KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into
 Blender and start creating!
-""".replace("\n", " ")
+
+(Note for Linux/macOS users: If you run into any issues, make sure you're running python 3.10).
+""").strip()
 
 METADATA_CONTACT = {
     "name": "Bobbe",
