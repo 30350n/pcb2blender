@@ -50,6 +50,14 @@ them, after last minute board revisions.
   `Edit -> Preferences -> Add-ons -> Install`<br>
   (you need to install the actual zip file, don't unpack it!)
   and enable it (enabling the addon for the first time will take a few minutes).
+  
+### Note on python version (Linux and macOS)
+
+On Windows, KiCad and Blender both ship with their own bundled python version
+(python 3.9 for KiCad 6.0 and python 3.10 for Blender 3.2). On Linux/macOS, depending on the
+exact flavor and packaging/installation method used, either software might just use your
+systems python version directly. If you run into any issues, make sure you're running
+python 3.10, first.
 
 ## Other Projects
 
