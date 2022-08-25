@@ -771,7 +771,9 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         result = import_x3d.load(context, self.filepath, global_matrix=matrix)
         if not result == {"FINISHED"}:
             return result
-        objects = list(set(bpy.data.objects).difference(objects_before))
+
+        if not (objects := list(set(bpy.data.objects).difference(objects_before))):
+            return {"FINISHED"}
 
         for obj in objects:
             obj.matrix_world = Matrix.Scale(self.scale, 4) @ obj.matrix_world
