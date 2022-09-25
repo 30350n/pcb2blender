@@ -41,7 +41,8 @@ def export_pcb3d(filepath, boarddefs):
 
     layers_path = get_temppath(LAYERS)
     board = pcbnew.GetBoard()
-    bounds = tuple(map(ToMM, board.ComputeBoundingBox(aBoardEdgesOnly=True).getWxRect()))
+    bbox = board.ComputeBoundingBox(aBoardEdgesOnly=True)
+    bounds = tuple(map(ToMM, (bbox.GetTop(), bbox.GetLeft(), bbox.GetBottom(), bbox.GetRight())))
     bounds = (
         bounds[0] - SVG_MARGIN, bounds[1] - SVG_MARGIN,
         bounds[2] + SVG_MARGIN * 2, bounds[3] + SVG_MARGIN * 2
@@ -149,7 +150,6 @@ def export_layers(board, bounds, output_directory):
     plot_options.SetScale(1)
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(True)
-    plot_options.SetExcludeEdgeLayer(True)
     plot_options.SetDrillMarksType(PCB_PLOT_PARAMS.NO_DRILL_SHAPE)
 
     for layer in INCLUDED_LAYERS:
