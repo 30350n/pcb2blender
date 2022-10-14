@@ -1,6 +1,6 @@
 from .mat4cad.core import Material, rgb2hex, hex2rgb, srgb2lin
 from .mat4cad.colors import PCB_YELLOW
-from .mat4cad.blender import ShaderNodeBsdfMat4cad
+from .mat4cad.blender import register as register_mat4cad, unregister as unregister_mat4cad
 from .custom_node_utils import *
 
 import bpy
@@ -568,7 +568,6 @@ class ShaderNodePcbShader(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
         color_ramp.elements.new(0.7).color = (0, 0, 0, 0)
 
 shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", items=(
-    NodeItem("ShaderNodeBsdfMat4cad"),
     NodeItem("ShaderNodeBsdfPcbSurfaceFinish"),
     NodeItem("ShaderNodeBsdfPcbSolderMask"),
     NodeItem("ShaderNodeBsdfPcbSilkscreen"),
@@ -578,7 +577,6 @@ shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", i
 ))
 
 classes = (
-    ShaderNodeBsdfMat4cad,
     ShaderNodeBsdfPcbSurfaceFinish,
     ShaderNodeBsdfPcbSolderMask,
     ShaderNodeBsdfPcbSilkscreen,
@@ -588,6 +586,8 @@ classes = (
 )
 
 def register():
+    register_mat4cad()
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
@@ -598,3 +598,5 @@ def unregister():
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
+
+    unregister_mat4cad()
