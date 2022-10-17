@@ -182,11 +182,19 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
                 "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
             "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
                 {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
-            
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
+
+            "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("inputs", "Texture Strength"), 1: 0.5}),
+            "scratches": ("ShaderNodeMat4cadScratches", {}, {
+                "Color": ("inputs", "Color"), "Roughness": ("roughness", 0),
+                "Normal": ("bump", 0), "Strength": ("scratches_strength", 0),
+                "Vector": ("tex_coord", "Object"), "Scale": 3.0}),
+
+            "bevel": ("ShaderNodeBevel", {},
+                {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("inputs", "Color"), "Metallic": 1.0,
-                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
+                "Base Color": ("scratches", "Color"), "Metallic": 1.0,
+                "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -294,11 +302,25 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "bump": ("ShaderNodeBump", {}, {"Normal": ("inputs", "Normal"),
                 "Strength": ("strength", 0), "Distance": 1e-3, "Height": ("height", 0)}),
 
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
+            "noise_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("inputs", "Texture Strength"), 1: 0.65}),
+            "noise": ("ShaderNodeMat4cadNoise", {}, {
+                "Roughness": ("inputs", "Roughness"), "Normal": ("bump", 0),
+                "Strength": ("noise_strength", 0), "Vector": ("tex_coord", "Object")}),
+            "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("inputs", "Texture Strength"), 1: 0.3}),
+            "scratches": ("ShaderNodeMat4cadScratches", {}, {
+                "Color": ("mix_color", 0), "Roughness": ("noise", "Roughness"),
+                "Normal": ("noise", "Normal"), "Strength": ("scratches_strength", 0),
+                "Vector": ("tex_coord", "Object"), "Scale": 2.5}),
+
+            "bevel": ("ShaderNodeBevel", {},
+                {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("mix_color", 0), "Subsurface Color": ("mix_color", 0),
+                "Base Color": ("scratches", "Color"),
+                "Subsurface Color": ("scratches", "Color"),
                 "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
-                "Roughness": ("inputs", "Roughness"), "Normal": ("bevel", 0)}),
+                "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -445,7 +467,7 @@ class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
                 "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
             "roughness": ("ShaderNodeMapRange", {},
                 {"Value": ("noise_scaled", 0), "To Min": -0.15, "To Max": 0.15}),
-            
+
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Metallic": 1.0,
