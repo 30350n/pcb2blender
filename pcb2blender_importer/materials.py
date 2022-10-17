@@ -5,9 +5,9 @@ from .custom_node_utils import *
 
 import bpy
 from bpy.props import EnumProperty
-from bpy.types import ShaderNodeCustomGroup
 from mathutils import Vector
 
+from bpy.types import ShaderNodeCustomGroup
 from nodeitems_utils import NodeItem
 from nodeitems_builtins import ShaderNodeCategory
 
@@ -127,7 +127,7 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
 
     setup_node_tree(node_tree, nodes)
 
-class ShaderNodeBsdfPcbSurfaceFinish(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Surface Finish BSDF"
     bl_width_default = 180
 
@@ -196,7 +196,7 @@ class ShaderNodeBsdfPcbSurfaceFinish(CustomNodetreeNodeBase, ShaderNodeCustomGro
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
 
-class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 180
 
@@ -309,7 +309,7 @@ class ShaderNodeBsdfPcbSolderMask(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
 
-class ShaderNodeBsdfPcbSilkscreen(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Silkscreen BSDF"
     bl_width_default = 180
 
@@ -367,7 +367,7 @@ class ShaderNodeBsdfPcbSilkscreen(CustomNodetreeNodeBase, ShaderNodeCustomGroup)
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
 
-class ShaderNodeBsdfPcbBoardEdge(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Board Edge BSDF"
     bl_width_default = 180
 
@@ -418,7 +418,7 @@ class ShaderNodeBsdfPcbBoardEdge(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
 
         self.init_node_tree(inputs, nodes, outputs)
 
-class ShaderNodeBsdfSolder(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder BSDF"
     bl_width_default = 180
 
@@ -458,7 +458,7 @@ class ShaderNodeBsdfSolder(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
 
         self.init_node_tree(inputs, nodes, outputs)
 
-class ShaderNodePcbShader(CustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "PCB Shader"
     bl_width_default = 180
 
