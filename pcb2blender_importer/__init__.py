@@ -17,7 +17,7 @@ dependencies = {
     "skia-python": "skia",
     "pillow": "PIL",
 }
-module_names = ("import", "materials")
+module_names = ("importer", "materials")
 
 dependency_path = (Path(__file__).parent / "site-packages").resolve()
 dependency_path.mkdir(exist_ok=True)
