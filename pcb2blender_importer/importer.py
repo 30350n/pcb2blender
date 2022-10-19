@@ -72,9 +72,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         super().__init__()
 
     def execute(self, context):
-        props = self.properties
+        filepath = Path(self.filepath)
 
-        filepath = Path(props.filepath)
 
         if not filepath.is_file():
             return self.error(f"file \"{filepath}\" does not exist")
@@ -231,7 +230,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 bpy.data.objects.remove(boundingbox)
 
-                offset = M_TO_MM * board.bounds[0].to_3d()
+                offset = board.bounds[0].to_3d() * MM_TO_M
                 board_obj.data.transform(Matrix.Translation(-offset))
                 board_obj.location = offset
 
@@ -264,10 +263,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         in_bounds_y = y <= p_min.y and y > p_max.y
                         if in_bounds_x and in_bounds_y:
                             instance.parent = board.obj
-                            instance.location.xy -= p_min * M_TO_MM
+                            instance.location.xy -= p_min * MM_TO_M
                             break
                         elif in_bounds_x or in_bounds_y:
-                            partial_matches.append((board.obj, p_min * M_TO_MM))
+                            partial_matches.append((board.obj, p_min * MM_TO_M))
                     else:
                         if len(partial_matches) == 1:
                             instance.parent = partial_matches[0][0]
@@ -285,7 +284,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                         name, board = closest
                         instance.parent = board.obj
-                        instance.location.xy -= board.bounds[0] * M_TO_MM
+                        instance.location.xy -= board.bounds[0] * MM_TO_M
                         self.warning(
                             f"assigning component \"{component.name}\" (out of bounds) " \
                             f"to closest board \"{name}\""
@@ -327,7 +326,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
                     if name == "FPNL":
                         pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS) * 0.5
-                    stacked_obj.location = (offset + pcb_offset) * M_TO_MM
+                    stacked_obj.location = (offset + pcb_offset) * MM_TO_M
 
         # select pcb objects and make one active
 
@@ -351,7 +350,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 center /= len(top_level_boards)
 
                 for board in top_level_boards:
-                    board.obj.location.xy = (board.bounds[0] - center) * M_TO_MM
+                    board.obj.location.xy = (board.bounds[0] - center) * MM_TO_M
             else:
                 center = Vector(pcb_object.bound_box[0]) + pcb_object.dimensions * 0.5
                 matrix = Matrix.Translation(-center)
@@ -438,8 +437,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         margin = 0.01
 
         size = Vector((1.0, -1.0, 1.0)) * (bounds[1] - bounds[0]).to_3d()
-        scale = M_TO_MM * (size + 2.0 * Vector((margin, margin, 5.0)))
-        translation = M_TO_MM * (bounds[0] - Vector.Fill(2, margin)).to_3d()
+        scale =  (size + 2.0 * Vector((margin, margin, 5.0))) * MM_TO_M
+        translation = (bounds[0] - Vector.Fill(2, margin)).to_3d() * MM_TO_M
         matrix_scale = Matrix.Diagonal(scale).to_4x4()
         matrix_offset = Matrix.Translation(translation)
         bounds_matrix = matrix_offset @ matrix_scale @ Matrix.Translation((0.5, -0.5, 0))
@@ -705,10 +704,10 @@ PCB2_LAYER_NAMES = (
     "B_Silk",
 )
 
-M_TO_MM = 1e-3
+MM_TO_M = 1e-3
 INCH_TO_MM = 1 / 25.4
 
-FIX_X3D_SCALE = M_TO_MM * 2.54
+FIX_X3D_SCALE = 2.54 * MM_TO_M
 MATRIX_FIX_SCALE_INV = Matrix.Scale(FIX_X3D_SCALE, 4).inverted()
 
 regex_filter_components = re.compile(
