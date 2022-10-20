@@ -6,7 +6,7 @@ from mathutils import Vector, Matrix
 import tempfile, random, shutil, re, struct, math, io
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 
 from skia import SVGDOM, Stream, Surface, Color4f
@@ -33,6 +33,20 @@ INCLUDED_LAYERS = (
 REQUIRED_MEMBERS = {PCB, LAYERS}
 
 PCB_THICKNESS = 1.6 # mm
+
+@dataclass
+class Board:
+    bounds: tuple[Vector, Vector]
+    stacked_boards: list[tuple[str, Vector]]
+    obj: bpy.types.Object = None
+    component_objects: list[bpy.types.Object] = field(default_factory=list)
+
+@dataclass
+class PCB3D:
+    content: str
+    components: list[str]
+    layers_bounds: tuple[float, float, float, float]
+    boards: dict[str, Board]
 
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     """Import a PCB3D file"""
@@ -69,12 +83,89 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
     def __init__(self):
         self.last_fpnl_path = ""
+        self.component_cache = {}
+        self.new_materials = set()
         super().__init__()
 
     def execute(self, context):
         filepath = Path(self.filepath)
 
+        # import boards
 
+        if (pcb := self.import_pcb3d(context, filepath)) == {"CANCELLED"}:
+            return {"CANCELLED"}
+
+        # import front panel
+
+        if has_svg2blender() and self.import_fpnl and self.fpnl_path != "":
+            if Path(self.fpnl_path).is_file():
+                bpy.ops.svg2blender.import_fpnl(
+                    filepath=self.fpnl_path,
+                    thickness=self.fpnl_thickness,
+                    bevel_depth=self.fpnl_bevel_depth,
+                    setup_camera=self.fpnl_setup_camera
+                )
+                pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object, [])
+            else:
+                self.warning(f"frontpanel file \"{filepath}\" does not exist")
+
+        # stack boards
+
+        if self.stack_boards:
+            for board in pcb.boards.values():
+                for (name, offset) in board.stacked_boards:
+                    if not name in pcb.boards:
+                        self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
+                        continue
+
+                    if not pcb.boards[name].obj:
+                        self.warning(
+                            f"ignoring stacked board \"{name}\" (cut_boards is set to False)")
+                        continue
+
+                    stacked_obj = pcb.boards[name].obj
+                    stacked_obj.parent = board.obj
+
+                    pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
+                    if name == "FPNL":
+                        pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS) * 0.5
+                    stacked_obj.location = (offset + pcb_offset) * MM_TO_M
+
+        # select pcb objects and make one active
+
+        bpy.ops.object.select_all(action="DESELECT")
+        top_level_boards = [board for board in pcb.boards.values() if not board.obj.parent]
+        context.view_layer.objects.active = top_level_boards[0].obj
+        for board in top_level_boards:
+            board.obj.select_set(True)
+
+        # center pcbs
+
+        if self.center_pcb:
+            center = Vector((0, 0))
+            for board in top_level_boards:
+                center += (board.bounds[0] + board.bounds[1]) * 0.5
+            center /= len(top_level_boards)
+
+            for board in top_level_boards:
+                board.obj.location.xy = (board.bounds[0] - center) * MM_TO_M
+
+        # materials
+
+        if self.merge_materials:
+            merge_materials(self.component_cache.values())
+
+        for material in self.new_materials.copy():
+            if not material.users:
+                self.new_materials.remove(material)
+                bpy.data.materials.remove(material)
+
+        if self.enhance_materials:
+            enhance_materials(self.new_materials)
+
+        return {"FINISHED"}
+
+    def import_pcb3d(self, context, filepath):
         if not filepath.is_file():
             return self.error(f"file \"{filepath}\" does not exist")
 
@@ -106,7 +197,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         for obj in pcb_objects:
             obj.data.transform(Matrix.Diagonal((*obj.scale, 1)))
             obj.scale = (1, 1, 1)
-
             self.setup_uvs(obj, pcb.layers_bounds)
 
         # rasterize/import layer svgs
@@ -137,17 +227,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # import components
 
-        component_map = {}
         if self.import_components:
             for component in pcb.components:
                 bpy.ops.pcb2blender.import_x3d(
                     filepath=str(tempdir / component), enhance_materials=False)
                 obj = context.object
                 obj.data.name = component.rsplit("/", 1)[1].rsplit(".", 1)[0]
-                component_map[component] = obj.data
+                self.component_cache[component] = obj.data
                 bpy.data.objects.remove(obj)
 
-        pcb_materials = set(bpy.data.materials) - materials_before
+        self.new_materials |= set(bpy.data.materials) - materials_before
 
         shutil.rmtree(tempdir)
 
@@ -195,7 +284,20 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # cut boards
 
-        if pcb.boards and self.cut_boards:
+        if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
+            name = f"PCB_{filepath.stem}"
+            pcb_object.name = pcb_object.data.name = name
+            bounds = (
+                Vector(pcb_object.bound_box[3]).xy * M_TO_MM,
+                Vector(pcb_object.bound_box[5]).xy * M_TO_MM,
+            )
+            matrix = Matrix.Translation(bounds[0].to_3d() * MM_TO_M)
+            pcb_object.data.transform(matrix.inverted())
+            pcb_object.matrix_world = matrix @ pcb_object.matrix_world
+
+            pcb_board = Board(bounds, [], pcb_object, [])
+            pcb.boards[name] = pcb_board
+        else:
             pcb_mesh = pcb_object.data
             bpy.data.objects.remove(pcb_object)
             for name, board in pcb.boards.items():
@@ -235,12 +337,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 board_obj.location = offset
 
                 board.obj = board_obj
-        else:
-            pcb_object.name = pcb_object.data.name = "PCB"
 
         # populate components
 
-        if self.import_components and component_map:
+        if self.import_components and self.component_cache:
             match = regex_filter_components.search(pcb.content)
             matrix_all = match2matrix(match)
             
@@ -248,130 +348,43 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 matrix_instance = match2matrix(match_instance)
                 url = match_instance.group("url")
 
-                component = component_map[url]
+                component = self.component_cache[url]
                 instance = bpy.data.objects.new(component.name, component)
                 instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
 
-                if pcb.boards and self.cut_boards:
-                    partial_matches = []
+                if not has_multiple_boards:
+                    parent_board = pcb_board
+                else:
                     for board in pcb.boards.values():
-                        x, y = instance.location.xy * 1000
+                        x, y = instance.location.xy * M_TO_MM
                         p_min, p_max = board.bounds
-
-                        in_bounds_x = x >= p_min.x and x < p_max.x
-                        in_bounds_y = y <= p_min.y and y > p_max.y
-                        if in_bounds_x and in_bounds_y:
-                            instance.parent = board.obj
-                            instance.location.xy -= p_min * MM_TO_M
+                        if x >= p_min.x and x < p_max.x and y <= p_min.y and y > p_max.y:
+                            parent_board = board
                             break
-                        elif in_bounds_x or in_bounds_y:
-                            partial_matches.append((board.obj, p_min * MM_TO_M))
                     else:
-                        if len(partial_matches) == 1:
-                            instance.parent = partial_matches[0][0]
-                            instance.location.xy -= partial_matches[0][1]
-                            continue
-
                         closest = None
                         min_distance = math.inf
                         for name, board in pcb.boards.items():
                             center = (board.bounds[0] + board.bounds[1]) * 0.5
-                            distance = (instance.location.xy * 1000 - center).length_squared
+                            distance = (instance.location.xy * M_TO_MM - center).length_squared
                             if distance < min_distance:
                                 min_distance = distance
                                 closest = (name, board)
 
-                        name, board = closest
-                        instance.parent = board.obj
-                        instance.location.xy -= board.bounds[0] * MM_TO_M
+                        name, parent_board = closest
                         self.warning(
                             f"assigning component \"{component.name}\" (out of bounds) " \
                             f"to closest board \"{name}\""
                         )
-                else:
-                    instance.parent = pcb_object
 
-        # import front panel
+                instance.location.xy -= parent_board.bounds[0] * MM_TO_M
+                instance.parent = parent_board.obj
+                parent_board.component_objects.append(instance)
 
-        if has_svg2blender() and self.import_fpnl and self.fpnl_path != "":
-            if Path(self.fpnl_path).is_file():
-                bpy.ops.svg2blender.import_fpnl(
-                    filepath=self.fpnl_path,
-                    thickness=self.fpnl_thickness,
-                    bevel_depth=self.fpnl_bevel_depth,
-                    setup_camera=self.fpnl_setup_camera
-                )
-                pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object)
-            else:
-                self.warning(f"frontpanel file \"{filepath}\" does not exist")
+        return pcb
 
-        # stack boards
-
-        if self.stack_boards:
-            for board in pcb.boards.values():
-                for (name, offset) in board.stacked_boards:
-                    if not name in pcb.boards:
-                        self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
-                        continue
-
-                    if not pcb.boards[name].obj:
-                        self.warning(
-                            f"ignoring stacked board \"{name}\" (cut_boards is set to False)")
-                        continue
-
-                    stacked_obj = pcb.boards[name].obj
-                    stacked_obj.parent = board.obj
-
-                    pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
-                    if name == "FPNL":
-                        pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS) * 0.5
-                    stacked_obj.location = (offset + pcb_offset) * MM_TO_M
-
-        # select pcb objects and make one active
-
-        bpy.ops.object.select_all(action="DESELECT")
-        if pcb.boards and self.cut_boards:
-            top_level_boards = [board for board in pcb.boards.values() if not board.obj.parent]
-            context.view_layer.objects.active = top_level_boards[0].obj
-            for board in top_level_boards:
-                board.obj.select_set(True)
-        else:
-            pcb_object.select_set(True)
-            context.view_layer.objects.active = pcb_object
-
-        # center pcbs
-
-        if self.center_pcb:
-            if pcb.boards and self.cut_boards:
-                center = Vector((0, 0))
-                for board in top_level_boards:
-                    center += (board.bounds[0] + board.bounds[1]) * 0.5
-                center /= len(top_level_boards)
-
-                for board in top_level_boards:
-                    board.obj.location.xy = (board.bounds[0] - center) * MM_TO_M
-            else:
-                center = Vector(pcb_object.bound_box[0]) + pcb_object.dimensions * 0.5
-                matrix = Matrix.Translation(-center)
-                self.apply_transformation(pcb_object, matrix)
-
-        # materials
-
-        if self.merge_materials:
-            merge_materials(component_map.values())
-
-        for material in pcb_materials.copy():
-            if not material.users:
-                pcb_materials.remove(material)
-                bpy.data.materials.remove(material)
-
-        if self.enhance_materials:
-            enhance_materials(pcb_materials)
-
-        return {"FINISHED"}
-
-    def parse_pcb3d(self, file, extract_dir):
+    def parse_pcb3d(self, file, extract_dir) -> PCB3D:
         zip_path = ZipPath(file)
 
         with file.open(PCB) as pcb_file:
@@ -678,19 +691,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         print(f"warning: {msg}")
         self.report({"WARNING"}, msg)
 
-@dataclass
-class Board:
-    bounds: tuple[Vector, Vector]
-    stacked_boards: list[tuple[str, Vector]]
-    obj: bpy.types.Object = None
-
-@dataclass
-class PCB3D:
-    content: str
-    components: list[str]
-    layers_bounds: tuple[float, float, float, float]
-    boards: dict[str, Board]
-
 PCB2_LAYER_NAMES = (
     "Board",
     "F_Cu",
@@ -705,6 +705,7 @@ PCB2_LAYER_NAMES = (
 )
 
 MM_TO_M = 1e-3
+M_TO_MM = 1e3
 INCH_TO_MM = 1 / 25.4
 
 FIX_X3D_SCALE = 2.54 * MM_TO_M
