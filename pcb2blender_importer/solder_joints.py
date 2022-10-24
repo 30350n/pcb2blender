@@ -3,7 +3,7 @@ from bpy.props import *
 
 import numpy as np
 
-from .importer import MM_TO_M
+from .importer import MM_TO_M, PCB_THICKNESS
 from .custom_node_utils import setup_node_tree
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
@@ -13,15 +13,15 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     pad_type: EnumProperty(name="Pad Type",
-        items=(("THT", "THT", "", 0), ("SMD", "SMD", "", 1)),
+        items=(("THT", "THT", ""), ("SMD", "SMD", "")),
         description="Type of pad")
     pad_shape: EnumProperty(name="Pad Shape",
-        items=(("SQUARE", "Square", "", 0), ("RECTANGULAR", "Rectangular", "", 1)),
+        items=(("SQUARE", "Square", ""), ("RECTANGULAR", "Rectangular", "")),
         description="Shape of the pad")
     pad_size: FloatVectorProperty(name="Pad Size", subtype="XYZ", size=2, default=(1.7, 1.7),
         description="Size of the pad")
     hole_shape: EnumProperty(name="Hole Shape",
-        items=(("CIRCULAR", "Circular", "", 0), ("OVAL", "Oval", "", 1)),
+        items=(("CIRCULAR", "Circular", ""), ("OVAL", "Oval", "")),
         description="Shape of the through hole")
     hole_size: FloatVectorProperty(name="Hole Size", subtype="XYZ", size=2, default=(1.0, 1.0),
         description="Size of the through hole")
@@ -35,22 +35,22 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         description="Rotation for the newly added object")
 
     def execute(self, context):
-        name = "THT Solder Joint"
+        name = "Solder Joint"
         mesh = bpy.data.meshes.new(name)
         obj = bpy.data.objects.new(name, mesh)
         context.collection.objects.link(obj)
 
         if self.pad_shape == "SQUARE":
             self.pad_size[1] = self.pad_size[0]
-        pad_size = np.array(self.pad_size)
+        pad_size = np.array(self.pad_size) * 1.04
         if self.hole_shape == "CIRCULAR":
             self.hole_size[1] = self.hole_size[0]
         hole_size = np.array(self.hole_size)
 
         if self.pad_type == "THT":
-            verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness)
+            verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness, PCB_THICKNESS)
         elif self.pad_type == "SMD":
-            verts, faces = solder_joint_smd(pad_size, self.roundness)
+            verts, faces = solder_joint_smd(pad_size, self.roundness, PCB_THICKNESS)
 
         verts *= MM_TO_M
         indices = faces.flatten()
@@ -126,30 +126,32 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         layout.prop(self, "location")
         layout.prop(self, "rotation")
 
-def solder_joint_tht(pad_size, hole_size, roundness=0.0):
+def solder_joint_tht(pad_size, hole_size, roundness=0.0, pcb_thickness=1.6):
     vs = np.empty((0, 3), dtype=float)
     fs = np.empty((0, 4), dtype=int)
 
     avg_size = (pad_size + hole_size) * 0.5
 
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.7, 0.10, 1.0, True)
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.9, 0.50, 1.0)
-    vs, fs = add_octagon_layer(vs, fs, pad_size,        0.70, max(roundness, 0.2))
-    vs, fs = add_octagon_layer(vs, fs, pad_size,        0.85, max(roundness, 0.2))
-    vs, fs = add_octagon_layer(vs, fs, avg_size  * 0.9, 1.05, 0.8)
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.9, 1.35, 0.7)
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.8, 1.65, 0.2)
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.5, 1.95, 0.6)
-    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.2, 2.00, 1.0, True)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 1.4, -(pcb_thickness + 0.1), 1.0, True)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.9, -0.30, 1.0)
+    vs, fs = add_octagon_layer(vs, fs, pad_size,        -0.10, max(roundness, 0.2))
+    vs, fs = add_octagon_layer(vs, fs, pad_size,         0.05, max(roundness, 0.2))
+    vs, fs = add_octagon_layer(vs, fs, avg_size  * 0.9,  0.25, 0.8)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.9,  0.55, 0.7)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.8,  0.85, 0.2)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.5,  1.15, 0.6)
+    vs, fs = add_octagon_layer(vs, fs, hole_size * 0.2,  1.20, 1.0, True)
+    vs += np.array((0, 0, pcb_thickness * 0.5))
 
     return vs, fs
 
-def solder_joint_smd(pad_size, roundness=0.0):
+def solder_joint_smd(pad_size, roundness=0.0, pcb_thickness=1.6):
     vs = np.empty((0, 3), dtype=float)
     fs = np.empty((0, 4), dtype=int)
 
-    vs, fs = add_octagon_layer(vs, fs, pad_size,        0.70, max(roundness, 0.2), True)
-    vs, fs = add_octagon_layer(vs, fs, pad_size,        0.85, max(roundness, 0.2), True)
+    vs, fs = add_octagon_layer(vs, fs, pad_size, -0.06, max(roundness, 0.2), True)
+    vs, fs = add_octagon_layer(vs, fs, pad_size,  0.04, max(roundness, 0.2), True)
+    vs += np.array((0, 0, pcb_thickness * 0.5))
 
     return vs, fs
 

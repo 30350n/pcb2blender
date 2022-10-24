@@ -447,7 +447,7 @@ class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     def init(self, context):
         inputs = {
             "Color": ("NodeSocketColor",
-                {"default_value": (*srgb2lin(hex2rgb("ddddd8")), 1.0)}),
+                {"default_value": (*srgb2lin(hex2rgb("aaaaa6")), 1.0)}),
             "Roughness": ("NodeSocketFloat",  {"default_value": 0.25}),
             "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
             "Normal": ("NodeSocketVector", {"hide_value": True}),
@@ -465,8 +465,9 @@ class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
                 {0: ("noise_combined", 0), 1: ("inputs", "Texture Strength")}),
             "bump": ("ShaderNodeBump", {}, {"Strength": 0.05, "Distance": 1e-3,
                 "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
-            "roughness": ("ShaderNodeMapRange", {},
-                {"Value": ("noise_scaled", 0), "To Min": -0.15, "To Max": 0.15}),
+            "roughness": ("ShaderNodeMapRange", {}, {
+                "Value": ("noise_scaled", 0), "To Min": ("inputs", "Roughness"),
+                "From Min": 0.4, "From Max": 0.8, "To Max": 0.05}),
 
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
