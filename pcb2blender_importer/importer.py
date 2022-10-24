@@ -7,6 +7,7 @@ import tempfile, random, shutil, re, struct, math, io
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
 from dataclasses import dataclass, field
+from enum import Enum
 import numpy as np
 
 from skia import SVGDOM, Stream, Surface, Color4f
@@ -25,6 +26,7 @@ LAYERS_BOUNDS = "bounds"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
+PADS = "pads"
 
 INCLUDED_LAYERS = (
     "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
@@ -40,6 +42,56 @@ class Board:
     stacked_boards: list[tuple[str, Vector]]
     obj: bpy.types.Object = None
 
+class PadType(Enum):
+    UNKNOWN = -1
+    THT = 0
+    SMD = 1
+    CONN = 2
+    NPTH = 3
+
+    @classmethod
+    def _missing_(cls, value):
+        print(f"warning: unknown pad type '{value}'")
+        return cls.UNKNOWN
+
+class PadShape(Enum):
+    UNKNOWN = -1
+    CIRCLE = 0
+    RECT = 1
+    OVAL = 2
+    TRAPEZOID = 3
+    ROUNDRECT = 4
+    CHAMFERED_RECT = 5
+    CUSTOM = 6
+
+    @classmethod
+    def _missing_(cls, value):
+        print(f"warning: unknown pad shape '{value}'")
+        return cls.UNKNOWN
+
+class DrillShape(Enum):
+    UNKNOWN = -1
+    CIRCULAR = 0
+    OVAL = 1
+
+    @classmethod
+    def _missing_(cls, value):
+        print(f"warning: unknown drill shape '{value}'")
+        return cls.UNKNOWN
+
+@dataclass
+class Pad:
+    position: Vector
+    is_flipped: bool
+    has_model: bool
+    is_tht_or_smd: bool
+    pad_type: PadType
+    shape: PadShape
+    size: Vector
+    rotation: float
+    roundness: float
+    drill_shape: DrillShape
+    drill_size: Vector
 
 @dataclass
 class PCB3D:
@@ -47,6 +99,7 @@ class PCB3D:
     components: list[str]
     layers_bounds: tuple[float, float, float, float]
     boards: dict[str, Board]
+    pads: dict[str, Pad]
 
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     """Import a PCB3D file"""
@@ -55,6 +108,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     bl_options = {"PRESET", "UNDO"}
 
     import_components: BoolProperty(name="Import Components", default=True)
+    add_solder_joints: EnumProperty(name="Add Solder Joints", default="SMART",
+        items=(
+            ("NONE", "None", "Do not add any solder joints"),
+            ("SMART", "Smart", "Only add solder joints to footprints that have THT/SMD "\
+                "attributes set and have 3D models"),
+            ("ALL", "All", "Add solder joints to all pads")))
     center_pcb:        BoolProperty(name="Center PCB", default=True)
 
     merge_materials:   BoolProperty(name="Merge Materials", default=True)
@@ -338,6 +397,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 board.obj = board_obj
 
+        related_objects = []
+
         # populate components
 
         if self.import_components and self.component_cache:
@@ -352,34 +413,95 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 instance = bpy.data.objects.new(component.name, component)
                 instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
+                related_objects.append(instance)
 
-                if not has_multiple_boards:
-                    parent_board = pcb_board
+        # add solder joints
+
+        solder_joint_cache = {}
+        if self.add_solder_joints != "NONE" and pcb.pads:
+            for pad_name, pad in pcb.pads.items():
+                if self.add_solder_joints == "SMART":
+                    if not pad.has_model or not pad.is_tht_or_smd:
+                        continue
+
+                if not pad.pad_type in {PadType.THT, PadType.SMD}:
+                    continue
+                if pad.shape == PadShape.UNKNOWN or pad.drill_shape == DrillShape.UNKNOWN:
+                    continue
+
+                pad_type = pad.pad_type.name
+                pad_size = pad.size
+                hole_shape = pad.drill_shape.name
+                hole_size = pad.drill_size
+                roundness = 0.0
+                match pad.shape:
+                    case PadShape.CIRCLE:
+                        pad_size = (pad.size[0], pad.size[0])
+                        roundness = 1.0
+                    case PadShape.OVAL:
+                        roundness = 1.0
+                    case PadShape.ROUNDRECT:
+                        roundness = pad.roundness * 2.0
+                    case PadShape.TRAPEZOID | PadShape.CHAMFERED_RECT | PadShape.CUSTOM:
+                        print(f"skipping solder joint for '{pad_name}', "\
+                            f"unsupported shape '{pad.shape.name}'")
+                        continue
+
+                cache_id = (pad_type, tuple(pad_size), hole_shape, tuple(hole_size), roundness)
+                if not (solder_joint := solder_joint_cache.get(cache_id)):
+                    bpy.ops.pcb2blender.solder_joint_add(
+                        pad_type=pad_type,
+                        pad_shape="RECTANGULAR",
+                        pad_size=pad_size,
+                        hole_shape=hole_shape,
+                        hole_size=hole_size,
+                        roundness=roundness,
+                        reuse_material=True,
+                    )
+                    solder_joint = context.object
+                    solder_joint_cache[cache_id] = solder_joint
+
+                obj = solder_joint.copy()
+                obj.name = f"SOLDER_{pad_name}"
+                obj.location.xy = pad.position * MM_TO_M
+                obj.rotation_euler.z = pad.rotation
+                obj.scale.z *= 1.0 if pad.is_flipped ^ (pad.pad_type == PadType.SMD) else -1.0
+                context.collection.objects.link(obj)
+                related_objects.append(obj)
+
+        for obj in solder_joint_cache.values():
+            bpy.data.objects.remove(obj)
+
+        if not has_multiple_boards:
+            for obj in related_objects:
+                obj.location.xy -= pcb_board.bounds[0] * MM_TO_M
+                obj.parent = pcb_board.obj
+        else:
+            for obj in related_objects:
+                for board in pcb.boards.values():
+                    x, y = obj.location.xy * M_TO_MM
+                    p_min, p_max = board.bounds
+                    if x >= p_min.x and x < p_max.x and y <= p_min.y and y > p_max.y:
+                        parent_board = board
+                        break
                 else:
-                    for board in pcb.boards.values():
-                        x, y = instance.location.xy * M_TO_MM
-                        p_min, p_max = board.bounds
-                        if x >= p_min.x and x < p_max.x and y <= p_min.y and y > p_max.y:
-                            parent_board = board
-                            break
-                    else:
-                        closest = None
-                        min_distance = math.inf
-                        for name, board in pcb.boards.items():
-                            center = (board.bounds[0] + board.bounds[1]) * 0.5
-                            distance = (instance.location.xy * M_TO_MM - center).length_squared
-                            if distance < min_distance:
-                                min_distance = distance
-                                closest = (name, board)
+                    closest = None
+                    min_distance = math.inf
+                    for name, board in pcb.boards.items():
+                        center = (board.bounds[0] + board.bounds[1]) * 0.5
+                        distance = (obj.location.xy * M_TO_MM - center).length_squared
+                        if distance < min_distance:
+                            min_distance = distance
+                            closest = (name, board)
 
-                        name, parent_board = closest
-                        self.warning(
-                            f"assigning component \"{component.name}\" (out of bounds) " \
-                            f"to closest board \"{name}\""
-                        )
+                    name, parent_board = closest
+                    self.warning(
+                        f"assigning \"{obj.name}\" (out of bounds) " \
+                        f"to closest board \"{name}\""
+                    )
 
-                instance.location.xy -= parent_board.bounds[0] * MM_TO_M
-                instance.parent = parent_board.obj
+                obj.location.xy -= parent_board.bounds[0] * MM_TO_M
+                obj.parent = parent_board.obj
 
         return pcb
 
@@ -437,7 +559,21 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
             boards[board_dir.name] = Board(bounds, stacked_boards)
 
-        return PCB3D(pcb_file_content, components, layers_bounds, boards)
+        pads = {}
+        for path in (zip_path / PADS).iterdir():
+            pad_struct = struct.unpack("!ff???BBffffBff", path.read_bytes())
+            pads[path.name] = Pad(
+                Vector((pad_struct[0], -pad_struct[1])),
+                *pad_struct[2:5],
+                PadType(pad_struct[5]),
+                PadShape(pad_struct[6]),
+                Vector(pad_struct[7:9]),
+                *pad_struct[9:11],
+                DrillShape(pad_struct[11]),
+                Vector(pad_struct[12:14]),
+            )
+
+        return PCB3D(pcb_file_content, components, layers_bounds, boards, pads)
 
     @staticmethod
     def get_boundingbox(context, bounds):
@@ -475,7 +611,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         offset = np.array((layers_bounds[0], -layers_bounds[1]))
         size = np.array((layers_bounds[2], layers_bounds[3]))
-        uvs = (1e3 * vertices[:,:2][indices] - offset) / size + np.array((0, 1))
+        uvs = (vertices[:,:2][indices] * M_TO_MM - offset) / size + np.array((0, 1))
 
         uv_layer = mesh.uv_layers[0]
         uv_layer.data.foreach_set("uv", uvs.flatten())

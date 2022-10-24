@@ -34,6 +34,8 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
     rotation: FloatVectorProperty(name="Rotation", subtype="EULER",
         description="Rotation for the newly added object")
 
+    reuse_material: BoolProperty(name="Reuse Material", default=False)
+
     def execute(self, context):
         name = "Solder Joint"
         mesh = bpy.data.meshes.new(name)
@@ -69,16 +71,17 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         mesh.update()
         mesh.validate()
 
-        material = bpy.data.materials.new(name)
+        if not (self.reuse_material and (material := bpy.data.materials.get(name))):
+            material = bpy.data.materials.new(name)
+            material.use_nodes = True
+            material.node_tree.nodes.clear()
+            nodes = {
+                "shader": ("ShaderNodeBsdfSolder", {}, {}),
+                "output": ("ShaderNodeOutputMaterial", {"location": (240, 0)},
+                    {"Surface": ("shader", 0)}),
+            }
+            setup_node_tree(material.node_tree, nodes)
         mesh.materials.append(material)
-        material.use_nodes = True
-        material.node_tree.nodes.clear()
-        nodes = {
-            "shader": ("ShaderNodeBsdfSolder", {}, {}),
-            "output": ("ShaderNodeOutputMaterial", {"location": (240, 0)},
-                {"Surface": ("shader", 0)}),
-        }
-        setup_node_tree(material.node_tree, nodes)
 
         bpy.ops.object.select_all(action="DESELECT")
         context.view_layer.objects.active = obj

@@ -14,6 +14,7 @@ LAYERS_BOUNDS = "bounds"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
+PADS = "pads"
 
 INCLUDED_LAYERS = (
     "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
@@ -72,6 +73,30 @@ def export_pcb3d(filepath, boarddefs):
                     str(subdir / (STACKED + stacked.name)),
                     struct.pack("!fff", *stacked.offset)
                 )
+
+        for footprint in board.Footprints():
+            has_model = len(footprint.Models()) > 0
+            is_tht_or_smd = bool(
+                footprint.GetAttributes() & (pcbnew.FP_THROUGH_HOLE | pcbnew.FP_SMD))
+            value = footprint.GetValue()
+            reference = footprint.GetReference()
+            for i, pad in enumerate(footprint.Pads()):
+                name = f"{value}_{reference}_{i}"
+                data = struct.pack(
+                    "!ff???BBffffBff",
+                    *map(ToMM, pad.GetPosition()),
+                    pad.IsFlipped(),
+                    has_model,
+                    is_tht_or_smd,
+                    pad.GetAttribute(),
+                    pad.GetShape(),
+                    *map(ToMM, pad.GetSize()),
+                    pad.GetOrientationRadians(),
+                    pad.GetRoundRectRadiusRatio(),
+                    pad.GetDrillShape(),
+                    *map(ToMM, pad.GetDrillSize()),
+                )
+                file.writestr(str(Path(PADS) / name), data)
 
 def get_boarddefs(board):
     boarddefs = {}
@@ -139,7 +164,7 @@ def get_boarddefs(board):
 
     return boarddefs, ignored
 
-def export_layers(board, bounds, output_directory):
+def export_layers(board, bounds, output_directory: Path):
     plot_controller = PlotController(board)
     plot_options = plot_controller.GetPlotOptions()
     plot_options.SetOutputDirectory(output_directory)
