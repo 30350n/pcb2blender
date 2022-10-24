@@ -14,10 +14,7 @@ skipping all the boring cleanup work that would be required without it.
 Its quick export/import times also make it viable to create renders of WIP boards or to update
 them, after last minute board revisions.
 
-<table><tr>
-     <td><img src="images/pcb_material.jpg"/></td>
-     <td><img src="images/breakout.jpg"/></td>
-</tr></table>
+<img src="images/e201_soldered.jpg"/>
 
 ## Usage
 
