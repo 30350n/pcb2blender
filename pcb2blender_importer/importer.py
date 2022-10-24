@@ -39,7 +39,7 @@ class Board:
     bounds: tuple[Vector, Vector]
     stacked_boards: list[tuple[str, Vector]]
     obj: bpy.types.Object = None
-    component_objects: list[bpy.types.Object] = field(default_factory=list)
+
 
 @dataclass
 class PCB3D:
@@ -105,7 +105,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     bevel_depth=self.fpnl_bevel_depth,
                     setup_camera=self.fpnl_setup_camera
                 )
-                pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object, [])
+                pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object)
             else:
                 self.warning(f"frontpanel file \"{filepath}\" does not exist")
 
@@ -295,7 +295,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             pcb_object.data.transform(matrix.inverted())
             pcb_object.matrix_world = matrix @ pcb_object.matrix_world
 
-            pcb_board = Board(bounds, [], pcb_object, [])
+            pcb_board = Board(bounds, [], pcb_object)
             pcb.boards[name] = pcb_board
         else:
             pcb_mesh = pcb_object.data
@@ -380,7 +380,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
                 instance.location.xy -= parent_board.bounds[0] * MM_TO_M
                 instance.parent = parent_board.obj
-                parent_board.component_objects.append(instance)
 
         return pcb
 
