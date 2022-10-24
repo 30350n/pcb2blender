@@ -209,7 +209,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
     bl_width_default = 180
 
     def update_props(self, context):
-        roughness = 0.5
+        roughness = 0.25
         match self.soldermask:
             case "GREEN":
                 light_color = hex2rgb("28a125")
@@ -226,11 +226,14 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             case "WHITE":
                 light_color = hex2rgb("d3cfc9")
                 dark_color  = hex2rgb("e1dddc")
-                roughness = 0.3
+                roughness = 0.15
             case "BLACK":
                 light_color = hex2rgb("10100f")
                 dark_color  = hex2rgb("000000")
-                roughness = 0.9
+            case "MATTE_BLACK":
+                light_color = hex2rgb("000000")
+                dark_color  = hex2rgb("000000")
+                roughness = 1.6
 
         if not self.soldermask == "CUSTOM":
             self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
@@ -248,6 +251,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ("BLUE",   "Blue",   ""),
         ("WHITE",  "White",  ""),
         ("BLACK",  "Black",  ""),
+        ("MATTE_BLACK",  "Matte Black",  ""),
         ("CUSTOM", "Custom", ""),
     ))
 
@@ -255,7 +259,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         inputs = {
             "Light Color": ("NodeSocketColor",  {}),
             "Dark Color":  ("NodeSocketColor",  {}),
-            "Roughness":   ("NodeSocketFloat",  {}),
+            "Roughness":   ("NodeSocketFloat",  {"default_value": 0.25}),
             "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
             "Normal": ("NodeSocketVector", {"hide_value": True}),
             "F_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
@@ -302,11 +306,20 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "bump": ("ShaderNodeBump", {}, {"Normal": ("inputs", "Normal"),
                 "Strength": ("strength", 0), "Distance": 1e-3, "Height": ("height", 0)}),
 
+            "roughness_cu": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+                {0: ("inputs", "Roughness"), 1: 0.5}),
+            "roughness": ("ShaderNodeMapRange", {}, {"Value": ("cu", 0),
+                "From Min": 1.0, "From Max": 0.0,
+                "To Min": ("roughness_cu", 0), "To Max": ("inputs", "Roughness")}),
+
             "noise_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
                 {0: ("inputs", "Texture Strength"), 1: 0.65}),
+            "noise_scale": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+                {0: ("cu", 0), 1: 150.0, 2: 0.5}),
             "noise": ("ShaderNodeMat4cadNoise", {}, {
-                "Roughness": ("inputs", "Roughness"), "Normal": ("bump", 0),
-                "Strength": ("noise_strength", 0), "Vector": ("tex_coord", "Object")}),
+                "Roughness": ("roughness", 0), "Normal": ("bump", 0),
+                "Strength": ("noise_strength", 0), "Vector": ("tex_coord", "Object"),
+                "Scale": ("noise_scale", 0)}),
             "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
                 {0: ("inputs", "Texture Strength"), 1: 0.3}),
             "scratches": ("ShaderNodeMat4cadScratches", {}, {
@@ -318,7 +331,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
                 {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("scratches", "Color"),
-                "Subsurface Color": ("scratches", "Color"),
+                "Subsurface Color": ("scratches", "Color"), "Metallic": 0.6,
                 "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
                 "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
         }
