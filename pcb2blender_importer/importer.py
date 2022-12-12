@@ -125,7 +125,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
     pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
-        items=(("RASTERIZED", "Rasterized", ""), ("3D", "3D", "")))
+        items=(("RASTERIZED", "Rasterized (Cycles)", ""), ("3D", "3D (deprecated)", "")))
     texture_dpi:       FloatProperty(name="Texture DPI",
         default=1016.0, soft_min=508.0, soft_max=2032.0)
 
@@ -213,6 +213,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # materials
 
+        if self.pcb_material == "RASTERIZED":
+            context.scene.render.engine = "CYCLES"
+
         if self.merge_materials:
             merge_materials(self.component_cache.values())
 
@@ -262,7 +265,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # rasterize/import layer svgs
 
-        if self.pcb_material == "RASTERIZED" and self.enhance_materials:
+        if self.enhance_materials and self.pcb_material == "RASTERIZED":
             layers_path = tempdir / LAYERS
             dpi = self.texture_dpi
             images = {}
@@ -317,7 +320,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         pcb_meshes = {obj.data for obj in pcb_objects if obj.type == "MESH"}
 
-        if self.pcb_material == "RASTERIZED" and self.enhance_materials:
+        if self.enhance_materials and self.pcb_material == "RASTERIZED":
             for obj in pcb_objects[1:]:
                 bpy.data.objects.remove(obj)
             pcb_object = pcb_objects[0]
