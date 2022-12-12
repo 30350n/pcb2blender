@@ -527,25 +527,30 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layers_bounds = struct.unpack("!ffff", layers_bounds_path.read_bytes())
 
         boards = {}
-        for board_dir in (zip_path / BOARDS).iterdir():
-            bounds_path = board_dir / BOUNDS
-            if not bounds_path.exists():
-                continue
+        if not (boards_path := (zip_path / BOARDS)).exists():
+            self.warning(f"old file format: PCB3D file doesn't contain \"{BOARDS}\" dir")
+        else:
+            for board_dir in boards_path.iterdir():
+                bounds_path = board_dir / BOUNDS
+                if not bounds_path.exists():
+                    continue
 
-            try:
-                bounds = struct.unpack("!ffff", bounds_path.read_bytes())
-            except struct.error:
-                self.warning(f"ignoring board \"{board_dir}\" (corrupted)")
-                continue
+                try:
+                    bounds = struct.unpack("!ffff", bounds_path.read_bytes())
+                except struct.error:
+                    self.warning(f"ignoring board \"{board_dir}\" (corrupted)")
+                    continue
 
-            bounds = (
-                Vector((bounds[0], -bounds[1])),
-                Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3])))
-            )
+                bounds = (
+                    Vector((bounds[0], -bounds[1])),
+                    Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3])))
+                )
 
-            stacked_boards = []
-            for path in board_dir.iterdir():
-                if path.name.startswith(STACKED):
+                stacked_boards = []
+                for path in board_dir.iterdir():
+                    if not path.name.startswith(STACKED):
+                        continue
+
                     try:
                         offset = struct.unpack("!fff", path.read_bytes())
                     except struct.error:
@@ -557,21 +562,24 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         Vector((offset[0], -offset[1], offset[2])),
                     ))
 
-            boards[board_dir.name] = Board(bounds, stacked_boards)
+                boards[board_dir.name] = Board(bounds, stacked_boards)
 
         pads = {}
-        for path in (zip_path / PADS).iterdir():
-            pad_struct = struct.unpack("!ff???BBffffBff", path.read_bytes())
-            pads[path.name] = Pad(
-                Vector((pad_struct[0], -pad_struct[1])),
-                *pad_struct[2:5],
-                PadType(pad_struct[5]),
-                PadShape(pad_struct[6]),
-                Vector(pad_struct[7:9]),
-                *pad_struct[9:11],
-                DrillShape(pad_struct[11]),
-                Vector(pad_struct[12:14]),
-            )
+        if not (pads_path := (zip_path / PADS)).exists():
+            self.warning(f"old file format: PCB3D file doesn't contain \"{PADS}\" dir")
+        else:
+            for path in pads_path.iterdir():
+                pad_struct = struct.unpack("!ff???BBffffBff", path.read_bytes())
+                pads[path.name] = Pad(
+                    Vector((pad_struct[0], -pad_struct[1])),
+                    *pad_struct[2:5],
+                    PadType(pad_struct[5]),
+                    PadShape(pad_struct[6]),
+                    Vector(pad_struct[7:9]),
+                    *pad_struct[9:11],
+                    DrillShape(pad_struct[11]),
+                    Vector(pad_struct[12:14]),
+                )
 
         return PCB3D(pcb_file_content, components, layers_bounds, boards, pads)
 
