@@ -85,6 +85,7 @@ class Pad:
     is_flipped: bool
     has_model: bool
     is_tht_or_smd: bool
+    has_paste: bool
     pad_type: PadType
     shape: PadShape
     size: Vector
@@ -112,7 +113,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         items=(
             ("NONE", "None", "Do not add any solder joints"),
             ("SMART", "Smart", "Only add solder joints to footprints that have THT/SMD "\
-                "attributes set and have 3D models"),
+                "attributes set and that have 3D models and only to pads which have a "\
+                "solder paste layer (for SMD pads)"),
             ("ALL", "All", "Add solder joints to all pads")))
     center_pcb:        BoolProperty(name="Center PCB", default=True)
 
@@ -423,6 +425,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 if self.add_solder_joints == "SMART":
                     if not pad.has_model or not pad.is_tht_or_smd:
                         continue
+                    if pad.pad_type == PadType.SMD and not pad.has_paste:
+                        continue
 
                 if not pad.pad_type in {PadType.THT, PadType.SMD}:
                     continue
@@ -569,16 +573,21 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             self.warning(f"old file format: PCB3D file doesn't contain \"{PADS}\" dir")
         else:
             for path in pads_path.iterdir():
-                pad_struct = struct.unpack("!ff???BBffffBff", path.read_bytes())
+                try:
+                    pad_struct = struct.unpack("!ff????BBffffBff", path.read_bytes())
+                except struct.error:
+                    self.warning(f"old file format: failed to parse pads")
+                    break
+
                 pads[path.name] = Pad(
                     Vector((pad_struct[0], -pad_struct[1])),
-                    *pad_struct[2:5],
-                    PadType(pad_struct[5]),
-                    PadShape(pad_struct[6]),
-                    Vector(pad_struct[7:9]),
-                    *pad_struct[9:11],
-                    DrillShape(pad_struct[11]),
-                    Vector(pad_struct[12:14]),
+                    *pad_struct[2:6],
+                    PadType(pad_struct[6]),
+                    PadShape(pad_struct[7]),
+                    Vector(pad_struct[8:10]),
+                    *pad_struct[10:12],
+                    DrillShape(pad_struct[12]),
+                    Vector(pad_struct[13:15]),
                 )
 
         return PCB3D(pcb_file_content, components, layers_bounds, boards, pads)
