@@ -81,7 +81,7 @@ def export_pcb3d(filepath, boarddefs):
             value = footprint.GetValue()
             reference = footprint.GetReference()
             for j, pad in enumerate(footprint.Pads()):
-                name = f"{value}_{reference}_{i}_{j}"
+                name = sanitized(f"{value}_{reference}_{i}_{j}")
                 is_flipped = pad.IsFlipped()
                 has_paste = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
                 data = struct.pack(
