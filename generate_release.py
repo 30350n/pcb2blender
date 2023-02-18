@@ -158,7 +158,7 @@ if __name__ == "__main__":
     if Repo().is_dirty():
         print("error: repo is dirty (stash changes before generating a release)")
         exit()
-    if not "up-to-date" in Repo().git.status():
+    if not "up to date" in Repo().git.status():
         print("error: current commit is not pushed")
         exit()
     if Repo().tags[-1].commit != Repo().commit():
