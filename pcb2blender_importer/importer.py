@@ -4,7 +4,7 @@ from bpy.props import *
 from mathutils import Vector, Matrix
 
 import tempfile, random, shutil, re, struct, io
-from math import inf
+from math import inf, radians
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
 from dataclasses import dataclass
@@ -303,19 +303,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         shutil.rmtree(tempdir)
 
-        # enhance pcb
+        # improve board mesh
 
-        can_enhance = len(pcb_objects) == len(PCB2_LAYER_NAMES)
-        if can_enhance:
-            layers = dict(zip(PCB2_LAYER_NAMES, pcb_objects))
-            for name, obj in layers.items():
-                obj.data.materials[0].name = name
+        board_obj = pcb_objects[0]
+        self.improve_board_mesh(context, board_obj)
 
-            board = layers["Board"]
-            self.improve_board_mesh(board.data)
-        else:
-            self.warning(f"cannot enhance pcb"\
-                f"(imported {len(pcb_objects)} layers, expected {len(PCB2_LAYER_NAMES)})")
+        # enhance materials
 
         pcb_meshes = {obj.data for obj in pcb_objects if obj.type == "MESH"}
 
@@ -332,7 +325,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 for node_name in ("paste", "seperate_paste", "solder"):
                     board_material.node_tree.nodes[node_name].mute = True
         else:
-            if can_enhance:
+            if len(pcb_objects) == len(PCB2_LAYER_NAMES):
+                layers = dict(zip(PCB2_LAYER_NAMES, pcb_objects))
                 self.enhance_pcb_layers(context, layers)
                 pcb_objects = list(layers.values())
 
@@ -638,12 +632,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         uv_layer.data.foreach_set("uv", uvs.flatten())
 
     @staticmethod
-    def improve_board_mesh(mesh):
+    def improve_board_mesh(context, obj):
         # fill holes in board mesh to make subsurface shading work
         # create vertex color layer for board edge and through holes
 
         bm = bmesh.new()
-        bm.from_mesh(mesh)
+        bm.from_mesh(obj.data)
 
         board_edge = bm.loops.layers.color.new("Board Edge")
 
@@ -662,7 +656,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             except ValueError:
                 pass
 
-        filled = bmesh.ops.holes_fill(bm, edges=bm.edges[:])
+        filled = bmesh.ops.holes_fill(bm, edges=bm.edges)
 
         through_holes = bm.loops.layers.color.new("Through Holes")
         for face in bm.faces:
@@ -670,8 +664,19 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             for loop in face.loops:
                 loop[through_holes] = color
 
-        bm.to_mesh(mesh)
+        bm.to_mesh(obj.data)
         bm.free()
+
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        context.view_layer.objects.active = obj
+
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.dissolve_limited(angle_limit=radians(1.0))
+        bpy.ops.mesh.quads_convert_to_tris()
+        bpy.ops.mesh.beautify_fill(angle_limit=radians(1.0))
+        bpy.ops.mesh.tris_convert_to_quads()
+        bpy.ops.object.mode_set(mode="OBJECT")
 
     @classmethod
     def enhance_pcb_layers(cls, context, layers):
