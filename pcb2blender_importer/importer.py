@@ -328,6 +328,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
             board_material = pcb_object.data.materials[0]
             setup_pcb_material(board_material.node_tree, images)
+            if self.import_components and self.add_solder_joints != "NONE":
+                for node_name in ("paste", "seperate_paste", "solder"):
+                    board_material.node_tree.nodes[node_name].mute = True
         else:
             if can_enhance:
                 self.enhance_pcb_layers(context, layers)
