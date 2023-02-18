@@ -7,7 +7,8 @@ from hashlib import sha256
 from itertools import chain
 import json, shutil, requests, re
 
-TARGET_DIRECTORY = Path("release")
+RELEASE_DIRECTORY = Path("release")
+ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
 DESCRIPTION = re.sub(r"\n([^\n])", " \g<1>", """
 The pcb2blender workflow lets you create professionally looking product renders of all your
@@ -50,8 +51,8 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     latest_tag = tags[0]
     latest_version, latest_kicad_version, _ = latest_tag.name.split("-")
 
-    TARGET_DIRECTORY.mkdir(exist_ok=True)
-    zip_path = TARGET_DIRECTORY / f"{path.name}_{latest_version[1:].replace('.', '-')}.zip"
+    RELEASE_DIRECTORY.mkdir(exist_ok=True)
+    zip_path = RELEASE_DIRECTORY / f"{path.name}_{latest_version[1:].replace('.', '-')}.zip"
     with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
         plugin_dir = Path("plugins")
         for filepath in path.glob("**/*.py"):
@@ -78,7 +79,7 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
         zip_hash = sha256(file.read()).hexdigest()
         zip_hash_path.write_text(zip_hash)
 
-    metadata_dir = TARGET_DIRECTORY / "metadata"
+    metadata_dir = RELEASE_DIRECTORY / "metadata"
     metadata_dir.mkdir(exist_ok=True)
 
     if icon_path:
@@ -94,7 +95,7 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
             (info.file_size for info in zip_file.infolist()))
 
     version_json = json.dumps(metadata_latest_version, indent=4)
-    (TARGET_DIRECTORY / "version.json").write_text(version_json)
+    (RELEASE_DIRECTORY / "version.json").write_text(version_json)
 
     for tag in tags[1:]:
         url = f"{ORIGIN}/releases/download/{tag.name}/version.json"
@@ -122,8 +123,8 @@ def generate_blender_addon(path, extra_files=[]):
         print(f"warning: tag blender version ({version[1:]}) doesn't match blender version "\
             f"in bl_info ({bl_info_bversion})")
 
-    TARGET_DIRECTORY.mkdir(exist_ok=True)
-    zip_path = TARGET_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
+    RELEASE_DIRECTORY.mkdir(exist_ok=True)
+    zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
     with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
         extra_paths = (path / extra for extra in extra_files)
         for filepath in chain(path.glob("**/*.py"), extra_paths):
@@ -136,7 +137,7 @@ def generate_blender_addon(path, extra_files=[]):
         zip_hash = sha256(file.read()).hexdigest()
         zip_hash_path.write_text(zip_hash)
 
-    metadata_dir = TARGET_DIRECTORY / "metadata"
+    metadata_dir = RELEASE_DIRECTORY / "metadata"
     metadata_dir.mkdir(exist_ok=True)
 
 def get_bl_info_version(path):
@@ -151,6 +152,27 @@ version_regex  = re.compile(r"bl_info\s*=\s*{[^}]*\"version\"\s*:\s*\(([^^\)]*)\
 bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
 
 if __name__ == "__main__":
+    if Repo().head.is_detached:
+        print("error: repo is in detached head state")
+        exit()
+    if Repo().is_dirty():
+        print("error: repo is dirty (stash changes before generating a release)")
+        exit()
+    if not "up-to-date" in Repo().git.status():
+        print("error: current commit is not pushed")
+        exit()
+    if Repo().tags[-1].commit != Repo().commit():
+        print("error: current commit is not tagged")
+        exit()
+
+    print(f"generating release for {Repo().tags[-1]} ...")
+
+    ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
+    for path in RELEASE_DIRECTORY.glob("*.zip*"):
+        if not path.is_file():
+            continue
+        shutil.move(path, ARCHIVE_DIRECTORY / path.name)
+
     generate_kicad_addon(
         Path(__file__).parent / "pcb2blender_exporter",
         METADATA,
@@ -161,3 +183,5 @@ if __name__ == "__main__":
     generate_blender_addon(
         Path(__file__).parent / "pcb2blender_importer",
     )
+
+    print("... done.")
