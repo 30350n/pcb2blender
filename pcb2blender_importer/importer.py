@@ -591,16 +591,15 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
     @staticmethod
     def get_boundingbox(context, bounds):
-        name = "pcb2blender_bounds_tmp"
-        mesh = bpy.data.meshes.new(name)
-        obj = bpy.data.objects.new(name, mesh)
+        NAME = "pcb2blender_bounds_tmp"
+        mesh = bpy.data.meshes.new(NAME)
+        obj = bpy.data.objects.new(NAME, mesh)
         context.collection.objects.link(obj)
 
-        margin = 0.01
-
+        MARGIN_MM = -0.01
         size = Vector((1.0, -1.0, 1.0)) * (bounds[1] - bounds[0]).to_3d()
-        scale =  (size + 2.0 * Vector((margin, margin, 5.0))) * MM_TO_M
-        translation = (bounds[0] - Vector.Fill(2, margin)).to_3d() * MM_TO_M
+        scale =  (size + 2.0 * Vector((MARGIN_MM, MARGIN_MM, 5.0))) * MM_TO_M
+        translation = (bounds[0] - Vector((MARGIN_MM, -MARGIN_MM))).to_3d() * MM_TO_M
         matrix_scale = Matrix.Diagonal(scale).to_4x4()
         matrix_offset = Matrix.Translation(translation)
         bounds_matrix = matrix_offset @ matrix_scale @ Matrix.Translation((0.5, -0.5, 0))
