@@ -3,10 +3,11 @@ from bpy_extras.io_utils import ImportHelper, orientation_helper, axis_conversio
 from bpy.props import *
 from mathutils import Vector, Matrix
 
-import tempfile, random, shutil, re, struct, math, io
+import tempfile, random, shutil, re, struct, io
+from math import inf
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile, Path as ZipPath
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 import numpy as np
 
@@ -34,7 +35,7 @@ INCLUDED_LAYERS = (
 
 REQUIRED_MEMBERS = {PCB, LAYERS}
 
-PCB_THICKNESS = 1.6 # mm
+PCB_THICKNESS_MM = 1.6
 
 @dataclass
 class Board:
@@ -116,14 +117,13 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 "attributes set and that have 3D models and only to pads which have a "\
                 "solder paste layer (for SMD pads)"),
             ("ALL", "All", "Add solder joints to all pads")))
-    center_pcb:        BoolProperty(name="Center PCB", default=True)
 
-    merge_materials:   BoolProperty(name="Merge Materials", default=True)
-    enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-
+    center_boards:     BoolProperty(name="Center PCB", default=True)
     cut_boards:        BoolProperty(name="Cut PCBs", default=True)
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
+    merge_materials:   BoolProperty(name="Merge Materials", default=True)
+    enhance_materials: BoolProperty(name="Enhance Materials", default=True)
     pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
         items=(("RASTERIZED", "Rasterized (Cycles)", ""), ("3D", "3D (deprecated)", "")))
     texture_dpi:       FloatProperty(name="Texture DPI",
@@ -133,7 +133,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
     fpnl_path:         StringProperty(name="", subtype="FILE_PATH",
         description="")
-
     fpnl_thickness:    FloatProperty(name="Panel Thickness (mm)",
         default=2.0, soft_min=0.0, soft_max=5.0)
     fpnl_bevel_depth:  FloatProperty(name="Bevel Depth (mm)",
@@ -187,9 +186,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     stacked_obj = pcb.boards[name].obj
                     stacked_obj.parent = board.obj
 
-                    pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS))
+                    pcb_offset = Vector((0, 0, np.sign(offset.z) * PCB_THICKNESS_MM))
                     if name == "FPNL":
-                        pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS) * 0.5
+                        pcb_offset.z += (self.fpnl_thickness - PCB_THICKNESS_MM) * 0.5
                     stacked_obj.location = (offset + pcb_offset) * MM_TO_M
 
         # select pcb objects and make one active
@@ -200,9 +199,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         for board in top_level_boards:
             board.obj.select_set(True)
 
-        # center pcbs
+        # center boards
 
-        if self.center_pcb:
+        if self.center_boards:
             center = Vector((0, 0))
             for board in top_level_boards:
                 center += (board.bounds[0] + board.bounds[1]) * 0.5
@@ -368,7 +367,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
                 context.collection.objects.link(board_obj)
                 boundingbox = self.get_boundingbox(context, board.bounds)
-
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
 
                 # get rid of the bounding box if it got merged into the board for some reason
@@ -423,7 +421,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         # add solder joints
 
         solder_joint_cache = {}
-        if self.add_solder_joints != "NONE" and pcb.pads:
+        if self.import_components and self.add_solder_joints != "NONE" and pcb.pads:
             for pad_name, pad in pcb.pads.items():
                 if self.add_solder_joints == "SMART":
                     if not pad.has_model or not pad.is_tht_or_smd:
@@ -493,7 +491,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         break
                 else:
                     closest = None
-                    min_distance = math.inf
+                    min_distance = inf
                     for name, board in pcb.boards.items():
                         center = (board.bounds[0] + board.bounds[1]) * 0.5
                         distance = (obj.location.xy * M_TO_MM - center).length_squared
@@ -796,8 +794,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         layout = self.layout
 
         layout.prop(self, "import_components")
-        layout.prop(self, "center_pcb")
+        col = layout.column()
+        col.enabled = self.import_components
+        col.label(text="Add Solder Joints")
+        col.prop(self, "add_solder_joints", text="")
         layout.split()
+        layout.prop(self, "center_boards")
         layout.prop(self, "cut_boards")
         layout.prop(self, "stack_boards")
         layout.split()
@@ -919,7 +921,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     scale:             FloatProperty(name="Scale", default=FIX_X3D_SCALE, precision=5)
 
     def execute(self, context):
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action="DESELECT")
 
         objects_before = set(bpy.data.objects)
         matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()

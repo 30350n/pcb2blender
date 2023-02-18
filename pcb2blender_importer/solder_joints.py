@@ -3,7 +3,7 @@ from bpy.props import *
 
 import numpy as np
 
-from .importer import MM_TO_M, PCB_THICKNESS
+from .importer import MM_TO_M, PCB_THICKNESS_MM
 from .custom_node_utils import setup_node_tree
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
@@ -50,9 +50,9 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         hole_size = np.array(self.hole_size)
 
         if self.pad_type == "THT":
-            verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness, PCB_THICKNESS)
+            verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness, PCB_THICKNESS_MM)
         elif self.pad_type == "SMD":
-            verts, faces = solder_joint_smd(pad_size, self.roundness, PCB_THICKNESS)
+            verts, faces = solder_joint_smd(pad_size, self.roundness, PCB_THICKNESS_MM)
 
         verts *= MM_TO_M
         indices = faces.flatten()
