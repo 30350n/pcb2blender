@@ -1,5 +1,5 @@
 [![blender](https://img.shields.io/badge/blender-3.4.0-orange)](https://www.blender.org/)
-[![kicad](https://img.shields.io/badge/kicad-6.0.5-blue)](https://www.kicad.org/)
+[![kicad](https://img.shields.io/badge/kicad-7.0.0-blue)](https://www.kicad.org/)
 [![gplv3](https://img.shields.io/badge/license-GPLv3-lightgrey)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
 <img src="images/header.jpg"/>
@@ -51,7 +51,7 @@ them, after last minute board revisions.
 ### Note on python version (Linux and macOS)
 
 On Windows, KiCad and Blender both ship with their own bundled python version
-(python 3.9 for KiCad 6.0 and python 3.10 for Blender 3.2). On Linux/macOS, depending on the
+(python 3.9 for KiCad 7.0 and python 3.10 for Blender 3.4). On Linux/macOS, depending on the
 exact flavor and packaging/installation method used, either software might just use your
 systems python version directly. If you run into any issues, make sure you're running
 python 3.10, first.

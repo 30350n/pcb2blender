@@ -1,5 +1,5 @@
 import pcbnew
-from pcbnew import PLOT_CONTROLLER as PlotController, PCB_PLOT_PARAMS, PLOT_FORMAT_SVG, ToMM
+from pcbnew import ToMM, PLOT_CONTROLLER, PLOT_FORMAT_SVG, DRILL_MARKS_NO_DRILL_SHAPE
 
 import tempfile, shutil, struct, re
 from pathlib import Path
@@ -42,11 +42,11 @@ def export_pcb3d(filepath, boarddefs):
 
     layers_path = get_temppath(LAYERS)
     board = pcbnew.GetBoard()
-    bbox = board.ComputeBoundingBox(aBoardEdgesOnly=True)
-    bounds = tuple(map(ToMM, (bbox.GetTop(), bbox.GetLeft(), bbox.GetBottom(), bbox.GetRight())))
+    box = board.ComputeBoundingBox(aBoardEdgesOnly=True)
     bounds = (
-        bounds[0] - SVG_MARGIN, bounds[1] - SVG_MARGIN,
-        bounds[2] + SVG_MARGIN * 2, bounds[3] + SVG_MARGIN * 2
+        ToMM(box.GetLeft()) - SVG_MARGIN, ToMM(box.GetTop()) - SVG_MARGIN,
+        ToMM(box.GetRight() - box.GetLeft()) + SVG_MARGIN * 2,
+        ToMM(box.GetBottom() - box.GetTop()) + SVG_MARGIN * 2,
     )
     export_layers(board, bounds, layers_path)
 
@@ -95,7 +95,7 @@ def export_pcb3d(filepath, boarddefs):
                     pad.GetAttribute(),
                     pad.GetShape(),
                     *map(ToMM, pad.GetSize()),
-                    pad.GetOrientationRadians(),
+                    pad.GetOrientation().AsRadians(),
                     pad.GetRoundRectRadiusRatio(),
                     pad.GetDrillShape(),
                     *map(ToMM, pad.GetDrillSize()),
@@ -169,7 +169,7 @@ def get_boarddefs(board):
     return boarddefs, ignored
 
 def export_layers(board, bounds, output_directory: Path):
-    plot_controller = PlotController(board)
+    plot_controller = PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
     plot_options.SetOutputDirectory(output_directory)
 
@@ -178,7 +178,7 @@ def export_layers(board, bounds, output_directory: Path):
     plot_options.SetScale(1)
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(True)
-    plot_options.SetDrillMarksType(PCB_PLOT_PARAMS.NO_DRILL_SHAPE)
+    plot_options.SetDrillMarksType(DRILL_MARKS_NO_DRILL_SHAPE)
 
     for layer in INCLUDED_LAYERS:
         plot_controller.SetLayer(getattr(pcbnew, layer))
@@ -189,9 +189,9 @@ def export_layers(board, bounds, output_directory: Path):
         filepath = filepath.rename(filepath.parent / f"{layer}.svg")
 
         content = filepath.read_text()
-        width  = f"{bounds[2] * 0.1:.6f}cm"
-        height = f"{bounds[3] * 0.1:.6f}cm"
-        viewBox = " ".join(str(round(v * 1e6)) for v in bounds)
+        width  = f"{bounds[2]:.6f}mm"
+        height = f"{bounds[3]:.6f}mm"
+        viewBox = " ".join(f"{value:.6f}" for value in bounds)
         content = svg_header_regex.sub(svg_header_sub.format(width, height, viewBox), content)
         filepath.write_text(content)
 
