@@ -377,14 +377,13 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                             bm.verts.remove(vert)
                             break
 
-                board_edge = bm.loops.layers.color[0]
+                board_edge = bm.faces.layers.int["pcb_board_edge"]
                 for bb_face in boundingbox.data.polygons:
                     point = boundingbox.data.vertices[bb_face.vertices[0]].co
                     board_faces = (face for face in bm.faces if face.material_index == 0)
                     faces = self.get_overlapping_faces(board_faces, point, bb_face.normal)
                     for face in faces:
-                        for loop in face.loops:
-                            loop[board_edge] = (1, 1, 1, 1)
+                        face[board_edge] = 1
 
                 bm.to_mesh(board_obj.data)
                 bm.free()
@@ -639,30 +638,27 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         bm = bmesh.new()
         bm.from_mesh(obj.data)
 
-        board_edge = bm.loops.layers.color.new("Board Edge")
+        board_edge = bm.faces.layers.int.new("pcb_board_edge")
 
+        board_edge_verts = set()
         for face in bm.faces:
-            color = ((1, 1, 1, 1) if abs(face.normal.z) < 1e-3 and face.calc_area() > 1e-10
-                else (0, 0, 0, 1))
-            for loop in face.loops:
-                loop[board_edge] = color
+            if abs(face.normal.z) < 1e-3 and face.calc_area() > 1e-10:
+                face[board_edge] = 1
+                board_edge_verts = board_edge_verts.union(face.verts)
 
-        n_upper_verts = len(bm.verts) // 2
+        midpoint = len(bm.verts) // 2
         bm.verts.ensure_lookup_table()
-        for i, vert in enumerate(bm.verts[:n_upper_verts]):
-            other_vert = bm.verts[n_upper_verts + i]
-            try:
-                bm.edges.new((vert, other_vert))
-            except ValueError:
-                pass
+        for i, top_vert in enumerate(bm.verts[:midpoint]):
+            if top_vert in board_edge_verts:
+                continue
+            bot_vert = bm.verts[midpoint + i]
+            bm.edges.new((top_vert, bot_vert))
 
         filled = bmesh.ops.holes_fill(bm, edges=bm.edges)
 
-        through_holes = bm.loops.layers.color.new("Through Holes")
+        through_holes = bm.faces.layers.int.new("pcb_through_holes")
         for face in bm.faces:
-            color = (1, 1, 1, 1) if face in filled["faces"] else (0, 0, 0, 1)
-            for loop in face.loops:
-                loop[through_holes] = color
+            face[through_holes] = int(face in filled["faces"])
 
         bm.to_mesh(obj.data)
         bm.free()
