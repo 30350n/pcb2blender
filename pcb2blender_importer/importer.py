@@ -277,7 +277,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     back  = ImageOps.invert(back)
                     empty = Image.new("L", front.size)
 
-                png_path = layers_path / f"{layer}.png"
+                png_path = layers_path / f"{filepath.stem}_{layer}.png"
                 merged = Image.merge("RGB", (front, back, empty))
                 merged.save(png_path)
 
@@ -320,6 +320,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
 
             board_material = pcb_object.data.materials[0]
+            board_material.name = f"PCB_{filepath.stem}"
             setup_pcb_material(board_material.node_tree, images)
             if self.import_components and self.add_solder_joints != "NONE":
                 for node_name in ("paste", "seperate_paste", "solder"):
@@ -366,9 +367,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             for name, board in pcb.boards.items():
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
                 context.collection.objects.link(board_obj)
-                if self.enhance_materials and self.pcb_material == "RASTERIZED":
-                    board_obj.data.materials[0] = pcb_mesh.materials[0].copy()
-                    board_obj.data.materials[0].name = board_obj.name
 
                 boundingbox = self.get_boundingbox(context, board.bounds)
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
