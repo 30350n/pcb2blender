@@ -7,7 +7,8 @@ bl_info = {
     "location": "File > Import",
     "category": "Import-Export",
     "support": "COMMUNITY",
-    "wiki_url": "https://github.com/30350n/pcb2blender",
+    "doc_url": "https://github.com/30350n/pcb2blender",
+    "tracker_url": "https://github.com/30350n/pcb2blender/issues",
 }
 
 import importlib.util, subprocess, sys
