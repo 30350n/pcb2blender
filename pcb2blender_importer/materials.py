@@ -125,7 +125,7 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
             {"Surface": ("shader", "Shader"), "Displacement": ("shader", "Displacement")}),
     }
 
-    setup_node_tree(node_tree, nodes)
+    setup_node_tree(node_tree, nodes, label_nodes=False)
 
 class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Surface Finish BSDF"

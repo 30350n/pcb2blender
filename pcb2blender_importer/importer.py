@@ -127,16 +127,16 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
     pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
         items=(("RASTERIZED", "Rasterized (Cycles)", ""), ("3D", "3D (deprecated)", "")))
     texture_dpi:       FloatProperty(name="Texture DPI",
-        default=1016.0, soft_min=508.0, soft_max=2032.0)
+        default=1016.0, min=0.0, soft_min=508.0, soft_max=2032.0)
 
     import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
         description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
     fpnl_path:         StringProperty(name="", subtype="FILE_PATH",
         description="")
     fpnl_thickness:    FloatProperty(name="Panel Thickness (mm)",
-        default=2.0, soft_min=0.0, soft_max=5.0)
+        default=2.0, min=0.0, soft_max=5.0)
     fpnl_bevel_depth:  FloatProperty(name="Bevel Depth (mm)",
-        default=0.05, soft_min=0.0, soft_max=0.25)
+        default=0.05, min=0.0, soft_max=0.25)
     fpnl_setup_camera: BoolProperty(name="Setup Orthographic Camera", default=True)
 
     filter_glob:       StringProperty(default="*.pcb3d", options={"HIDDEN"})
@@ -347,6 +347,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name
+            if self.enhance_materials and self.pcb_material == "RASTERIZED":
+                pcb_object.data.materials[0].name = name
+
             bounds = (
                 Vector(pcb_object.bound_box[3]).xy * M_TO_MM,
                 Vector(pcb_object.bound_box[5]).xy * M_TO_MM,
@@ -363,6 +366,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             for name, board in pcb.boards.items():
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
                 context.collection.objects.link(board_obj)
+                if self.enhance_materials and self.pcb_material == "RASTERIZED":
+                    board_obj.data.materials[0] = pcb_mesh.materials[0].copy()
+                    board_obj.data.materials[0].name = board_obj.name
+
                 boundingbox = self.get_boundingbox(context, board.bounds)
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
 
