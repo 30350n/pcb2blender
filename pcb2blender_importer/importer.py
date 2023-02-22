@@ -345,7 +345,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         # cut boards
 
-        if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
+        if not self.cut_boards:
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name
             if self.enhance_materials and self.pcb_material == "RASTERIZED":
@@ -359,8 +359,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
             pcb_object.data.transform(matrix.inverted())
             pcb_object.matrix_world = matrix @ pcb_object.matrix_world
 
-            pcb_board = Board(bounds, [], pcb_object)
-            pcb.boards[name] = pcb_board
+            pcb.boards.clear()
+            pcb.boards[name] = Board(bounds, [], pcb_object)
+
         else:
             pcb_mesh = pcb_object.data
             bpy.data.objects.remove(pcb_object)
@@ -478,7 +479,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         for obj in solder_joint_cache.values():
             bpy.data.objects.remove(obj)
 
-        if not has_multiple_boards:
+        if not self.cut_boards:
+            pcb_board = pcb.boards[0]
             for obj in related_objects:
                 obj.location.xy -= pcb_board.bounds[0] * MM_TO_M
                 obj.parent = pcb_board.obj
@@ -503,8 +505,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                     name, parent_board = closest
                     self.warning(
                         f"assigning \"{obj.name}\" (out of bounds) " \
-                        f"to closest board \"{name}\""
-                    )
+                        f"to closest board \"{name}\"")
 
                 obj.location.xy -= parent_board.bounds[0] * MM_TO_M
                 obj.parent = parent_board.obj
