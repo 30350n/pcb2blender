@@ -644,6 +644,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         bm.from_mesh(obj.data)
 
         board_edge = bm.faces.layers.int.new("pcb_board_edge")
+        through_holes = bm.faces.layers.int.new("pcb_through_holes")
 
         board_edge_verts = set()
         for face in bm.faces:
@@ -661,9 +662,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         filled = bmesh.ops.holes_fill(bm, edges=bm.edges)
 
-        through_holes = bm.faces.layers.int.new("pcb_through_holes")
-        for face in bm.faces:
-            face[through_holes] = int(face in filled["faces"])
+        for face in filled["faces"]:
+            face[through_holes] = 1
 
         bm.to_mesh(obj.data)
         bm.free()
