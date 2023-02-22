@@ -369,30 +369,64 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
                 context.collection.objects.link(board_obj)
 
-                boundingbox = self.get_boundingbox(context, board.bounds)
+                cut_material_index = len(board_obj.material_slots) + 1
+                boundingbox = self.get_boundingbox(context, board.bounds, cut_material_index)
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
 
-                # get rid of the bounding box if it got merged into the board for some reason
-                # also reapply board edge vcs on the newly cut edge faces
+                # cleanup and reapply board edge vcs on the newly cut edge faces
                 bm = bmesh.new()
                 bm.from_mesh(board_obj.data)
 
-                for bb_vert in boundingbox.data.vertices:
-                    for vert in reversed(bm.verts[:]):
-                        if (bb_vert.co - vert.co).length_squared < 1e-8:
-                            bm.verts.remove(vert)
-                            break
+                bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-8)
+                bmesh.ops.triangulate(bm, faces=bm.faces)
 
                 board_edge = bm.faces.layers.int["pcb_board_edge"]
-                for bb_face in boundingbox.data.polygons:
-                    point = boundingbox.data.vertices[bb_face.vertices[0]].co
-                    board_faces = (face for face in bm.faces if face.material_index == 0)
-                    faces = self.get_overlapping_faces(board_faces, point, bb_face.normal)
-                    for face in faces:
+                for face in bm.faces:
+                    if face.material_index == cut_material_index:
                         face[board_edge] = 1
+                        face.material_index = 0
+                
+                board_edge_faces = {face for face in bm.faces if face[board_edge]}
+                board_edge_verts = {vert for face in board_edge_faces for vert in face.verts}
+
+                keep_verts = set()
+                for face in board_edge_faces:
+                    for edge in face.edges:
+                        if not board_edge_faces.issuperset(edge.link_faces):
+                            continue
+                        if edge.calc_face_angle(0) < radians(5.0):
+                            continue
+                        keep_verts = keep_verts.union(edge.verts)
+
+                board_edge_verts = board_edge_verts - keep_verts
+
+                MERGE_DISTANCE = PCB_THICKNESS_MM * MM_TO_M * 0.5
+                MERGE_DISTANCE_SQ = MERGE_DISTANCE ** 2
+
+                targetmap = {}
+                for keep_vert in keep_verts:
+                    for vert in board_edge_verts - keep_verts:
+                        if (keep_vert.co - vert.co).length_squared < MERGE_DISTANCE_SQ:
+                            targetmap[vert] = keep_vert
+                            board_edge_verts.remove(vert)
+
+                edge_doubles = bmesh.ops.find_doubles(bm, verts=list(board_edge_verts),
+                    dist=MERGE_DISTANCE)
+
+                targetmap = targetmap | edge_doubles["targetmap"]
+                bmesh.ops.weld_verts(bm, targetmap=targetmap)
 
                 bm.to_mesh(board_obj.data)
                 bm.free()
+
+                bpy.ops.object.select_all(action="DESELECT")
+                board_obj.select_set(True)
+                context.view_layer.objects.active = board_obj
+
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.mesh.beautify_fill(angle_limit=radians(1.0))
+                bpy.ops.mesh.tris_convert_to_quads()
+                bpy.ops.object.mode_set(mode="OBJECT")
 
                 bpy.data.objects.remove(boundingbox)
 
@@ -596,7 +630,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         return PCB3D(pcb_file_content, components, layers_bounds, boards, pads)
 
     @staticmethod
-    def get_boundingbox(context, bounds):
+    def get_boundingbox(context, bounds, material_index):
         NAME = "pcb2blender_bounds_tmp"
         mesh = bpy.data.meshes.new(NAME)
         obj = bpy.data.objects.new(NAME, mesh)
@@ -612,6 +646,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
 
         bm = bmesh.new()
         bmesh.ops.create_cube(bm, matrix=bounds_matrix)
+        for face in bm.faces:
+            face.material_index = material_index
         bm.to_mesh(obj.data)
         bm.free()
 
@@ -762,23 +798,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
         obj.data.transform(matrix)
         for child in obj.children:
             child.matrix_basis = matrix @ child.matrix_basis
-
-    @staticmethod
-    def get_overlapping_faces(bm_faces, point, normal):
-        overlapping_faces = []
-        for face in bm_faces:
-            if (1.0 - normal.dot(face.normal)) > 1e-4:
-                continue
-
-            direction = point - face.verts[0].co
-            distance = abs(
-                direction.normalized().dot(face.normal) * direction.length)
-            if distance > 1e-4:
-                continue
-
-            overlapping_faces.append(face)
-
-        return overlapping_faces
 
     @staticmethod
     def svg2img(svg_path, dpi):
