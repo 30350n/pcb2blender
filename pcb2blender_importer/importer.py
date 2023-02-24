@@ -15,6 +15,7 @@ from skia import SVGDOM, Stream, Surface, Color4f
 SKIA_MAGIC = 0.282222222
 from PIL import Image, ImageOps
 
+from .blender_addon_utils import ErrorHelper
 from .materials import setup_pcb_material, merge_materials, enhance_materials
 
 from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
@@ -103,7 +104,7 @@ class PCB3D:
     boards: dict[str, Board]
     pads: dict[str, Pad]
 
-class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
+class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper):
     """Import a PCB3D file"""
     bl_idname = "pcb2blender.import_pcb3d"
     bl_label = "Import .pcb3d"
@@ -866,15 +867,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper):
                         self.fpnl_path = ""
             else:
                 self.fpnl_path = ""
-
-    def error(self, msg):
-        print(f"error: {msg}")
-        self.report({"ERROR"}, msg)
-        return {"CANCELLED"}
-
-    def warning(self, msg):
-        print(f"warning: {msg}")
-        self.report({"WARNING"}, msg)
 
 PCB2_LAYER_NAMES = (
     "Board",
