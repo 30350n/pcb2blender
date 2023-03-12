@@ -346,7 +346,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         # cut boards
 
-        if not self.cut_boards:
+        if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name
             if self.enhance_materials and self.pcb_material == "RASTERIZED":
@@ -514,8 +514,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         for obj in solder_joint_cache.values():
             bpy.data.objects.remove(obj)
 
-        if not self.cut_boards:
-            pcb_board = pcb.boards[0]
+        if not has_multiple_boards:
+            pcb_board = next(iter(pcb.boards.values()))
             for obj in related_objects:
                 obj.location.xy -= pcb_board.bounds[0] * MM_TO_M
                 obj.parent = pcb_board.obj
