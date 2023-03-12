@@ -11,6 +11,9 @@ from bpy.types import ShaderNodeCustomGroup
 from nodeitems_utils import NodeItem
 from nodeitems_builtins import ShaderNodeCategory
 
+LAYER_BOARD_EDGE = "pcb_board_edge"
+LAYER_THROUGH_HOLES = "pcb_through_holes"
+
 def merge_materials(meshes):
     merged_materials = {}
     for mesh in meshes:
@@ -537,8 +540,8 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
                 {0: ("cu", 0), 1: ("mask", 0)}),
             "silks_cut": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
                 {0: ("silks", 0), 1: ("cu_exposed", 0)}),
-            "edge_vc": ("ShaderNodeAttribute", {"attribute_name": "pcb_board_edge"}, {}),
-            "hole_vc": ("ShaderNodeAttribute", {"attribute_name": "pcb_through_holes"}, {}),
+            "edge_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_BOARD_EDGE}, {}),
+            "hole_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_THROUGH_HOLES}, {}),
             "combined_vc": ("ShaderNodeMath", {"operation": "ADD", "use_clamp": True},
                 {0: ("edge_vc", "Fac"), 1: ("hole_vc", "Fac")}),
             "silks_cut2": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},

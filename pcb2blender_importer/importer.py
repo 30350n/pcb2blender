@@ -16,7 +16,7 @@ SKIA_MAGIC = 0.282222222
 from PIL import Image, ImageOps
 
 from .blender_addon_utils import ErrorHelper
-from .materials import setup_pcb_material, merge_materials, enhance_materials
+from .materials import *
 
 from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
 from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
@@ -381,7 +381,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-8)
                 bmesh.ops.triangulate(bm, faces=bm.faces)
 
-                board_edge = bm.faces.layers.int["pcb_board_edge"]
+                board_edge = bm.faces.layers.int[LAYER_BOARD_EDGE]
                 for face in bm.faces:
                     if face.material_index == cut_material_index:
                         face[board_edge] = 1
@@ -680,8 +680,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         bm = bmesh.new()
         bm.from_mesh(obj.data)
 
-        board_edge = bm.faces.layers.int.new("pcb_board_edge")
-        through_holes = bm.faces.layers.int.new("pcb_through_holes")
+        board_edge = bm.faces.layers.int.new(LAYER_BOARD_EDGE)
+        through_holes = bm.faces.layers.int.new(LAYER_THROUGH_HOLES)
 
         board_edge_verts = set()
         for face in bm.faces:
