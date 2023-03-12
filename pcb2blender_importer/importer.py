@@ -420,6 +420,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 bm.to_mesh(board_obj.data)
                 bm.free()
 
+                # uvs get messed up by weld_verts
+                self.setup_uvs(board_obj, pcb.layers_bounds)
+
                 bpy.ops.object.select_all(action="DESELECT")
                 board_obj.select_set(True)
                 context.view_layer.objects.active = board_obj
