@@ -36,8 +36,6 @@ INCLUDED_LAYERS = (
 
 REQUIRED_MEMBERS = {PCB, LAYERS}
 
-PCB_THICKNESS_MM = 1.6
-
 @dataclass
 class Board:
     bounds: tuple[Vector, Vector]
@@ -119,7 +117,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 "solder paste layer (for SMD pads)"),
             ("ALL", "All", "Add solder joints to all pads")))
 
-    center_boards:     BoolProperty(name="Center PCB", default=True)
+    center_boards:     BoolProperty(name="Center PCBs", default=True)
     cut_boards:        BoolProperty(name="Cut PCBs", default=True)
     stack_boards:      BoolProperty(name="Stack PCBs", default=True)
 
@@ -401,7 +399,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                 board_edge_verts = board_edge_verts - keep_verts
 
-                MERGE_DISTANCE = PCB_THICKNESS_MM * MM_TO_M * 0.5
+                MERGE_DISTANCE = PCB_THICKNESS * 0.5
                 MERGE_DISTANCE_SQ = MERGE_DISTANCE ** 2
 
                 targetmap = {}
@@ -890,6 +888,9 @@ INCH_TO_MM = 1 / 25.4
 
 FIX_X3D_SCALE = 2.54 * MM_TO_M
 MATRIX_FIX_SCALE_INV = Matrix.Scale(FIX_X3D_SCALE, 4).inverted()
+
+PCB_THICKNESS_MM = 1.6
+PCB_THICKNESS = PCB_THICKNESS_MM * MM_TO_M
 
 regex_filter_components = re.compile(
     r"(?P<prefix>Transform\s*{\s*"
