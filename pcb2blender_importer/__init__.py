@@ -21,5 +21,5 @@ deps = {
 }
 add_dependencies(deps, no_extra_deps=True)
 
-modules = ("importer", "materials", "solder_joints")
+modules = ("bake", "importer", "materials", "solder_joints")
 register, unregister = register_modules_factory(modules)

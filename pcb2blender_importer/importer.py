@@ -321,6 +321,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             board_material = pcb_object.data.materials[0]
             board_material.name = f"PCB_{filepath.stem}"
             setup_pcb_material(board_material.node_tree, images)
+            board_material.p2b_type = "NORMAL"
+            board_material.p2b_bounds = pcb.layers_bounds
             if self.import_components and self.add_solder_joints != "NONE":
                 for node_name in ("paste", "seperate_paste", "solder"):
                     board_material.node_tree.nodes[node_name].mute = True
@@ -337,6 +339,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             context.view_layer.objects.active = pcb_object
             bpy.ops.object.join()
             bpy.ops.object.transform_apply()
+
+        pcb_object.data.p2b_is_pcb = True
 
         for mesh in pcb_meshes:
             if not mesh.users:
