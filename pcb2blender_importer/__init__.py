@@ -2,8 +2,8 @@ bl_info = {
     "name": "pcb2blender importer",
     "description": "Enables Blender to import .pcb3d files, exported from KiCad.",
     "author": "Bobbe",
-    "version": (2, 4, 0),
-    "blender": (3, 4, 0),
+    "version": (2, 5, 0),
+    "blender": (3, 5, 0),
     "location": "File > Import",
     "category": "Import-Export",
     "support": "COMMUNITY",
@@ -11,7 +11,7 @@ bl_info = {
     "tracker_url": "https://github.com/30350n/pcb2blender/issues",
 }
 
-__version__ = "2.4"
+__version__ = "2.5"
 
 from .blender_addon_utils import add_dependencies, register_modules_factory
 
