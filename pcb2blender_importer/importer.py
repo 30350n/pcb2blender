@@ -664,7 +664,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         mesh = obj.data
 
         vertices = np.empty(len(mesh.vertices) * 3)
-        mesh.vertices.foreach_get("co", vertices)
+        mesh.attributes["position"].data.foreach_get("vector", vertices)
         vertices = vertices.reshape((len(mesh.vertices), 3))
 
         indices = np.empty(len(mesh.loops), dtype=int)
@@ -675,7 +675,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         uvs = (vertices[:,:2][indices] * M_TO_MM - offset) / size + np.array((0, 1))
 
         uv_layer = mesh.uv_layers[0]
-        uv_layer.data.foreach_set("uv", uvs.flatten())
+        uv_layer.uv.foreach_set("vector", uvs.flatten())
 
     @staticmethod
     def improve_board_mesh(context, obj):
