@@ -2,10 +2,11 @@ import bpy
 
 from itertools import product, chain
 from pathlib import Path
+from tempfile import gettempdir
 
 import pytest
 
-test_filepaths = (Path(__file__).parent / "test_pcbs").resolve().glob("**/*.pcb3d")
+test_filepaths = list((Path(__file__).parent / "test_pcbs").resolve().glob("**/*.pcb3d"))
 
 kwargs_test_permutations = {
     "import_components": (True, False),
@@ -41,3 +42,21 @@ def test_importer(path, kwargs):
     assert result == {"FINISHED"}
     assert len(bpy.context.view_layer.objects) > 0
     assert bpy.context.object != None
+
+def test_load_file():
+    test_path = str(Path(gettempdir()) / "pcb2blender_test.blend")
+
+    bpy.ops.wm.read_homefile(use_empty=True)
+    bpy.ops.pcb2blender.import_pcb3d(filepath=str(test_filepaths[0]))
+    bpy.ops.wm.save_mainfile(filepath=test_path)
+
+    assert not has_undefined_nodes()
+
+    bpy.ops.wm.read_homefile(use_empty=True)
+    bpy.ops.wm.open_mainfile(filepath=test_path)
+
+    assert not has_undefined_nodes()
+
+def has_undefined_nodes():
+    node_groups = (group for group in bpy.data.node_groups if group.type == "SHADER")
+    return "NodeUndefined" in (node.bl_idname for group in node_groups for node in group.nodes)
