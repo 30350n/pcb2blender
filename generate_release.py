@@ -6,7 +6,9 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from hashlib import sha256
 from itertools import chain
 from autopep8 import main as autopep8
-import json, shutil, requests, re
+from pytest import main as pytest
+from unittest.mock import patch
+import json, shutil, requests, re, sys
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
@@ -162,24 +164,41 @@ version_regex  = re.compile(r"bl_info\s*=\s*{[^}]*\"version\"\s*:\s*\(([^^\)]*)\
 bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
 package_version_regex  = re.compile(r"__version__\s*=\s*\"([^\"]*)\"")
 
+COLOR_INFO = "\033[94m"
+COLOR_SUCCESS = "\033[92m"
+COLOR_ERROR = "\033[91m"
+COLOR_END = "\033[0m"
+
+def info(msg):
+    print(f"{COLOR_INFO}{msg}{COLOR_END}")
+
+def success(msg):
+    print(f"{COLOR_SUCCESS}{msg}{COLOR_SUCCESS}")
+
+def error(msg):
+    print(f"{COLOR_ERROR}error: {msg}{COLOR_END}", file=sys.stderr)
+    exit()
+
 if __name__ == "__main__":
-    print("running autopep8 ...")
+    info("running autopep8 ...")
     autopep8(["", "--recursive", "--in-place", "."])
+    if Repo().is_dirty():
+        error("repo is dirty (stash changes before generating a release)")
+    success("done.")
+
+    with patch.object(sys, "argv", ["", "-q"]):
+        info("running pytest ...")
+        if (exit_code := pytest()) != 0:
+            error(f"tests failed with {exit_code}")
 
     if Repo().head.is_detached:
-        print("error: repo is in detached head state")
-        exit()
-    if Repo().is_dirty():
-        print("error: repo is dirty (stash changes before generating a release)")
-        exit()
+        error("repo is in detached head state")
     if "up to date" not in Repo().git.status():
-        print("error: current commit is not pushed")
-        exit()
+        error("current commit is not pushed")
     if Repo().tags[-1].commit != Repo().commit():
-        print("error: current commit is not tagged")
-        exit()
+        error("current commit is not tagged")
 
-    print(f"generating release for {Repo().tags[-1]} ...")
+    info(f"generating release for {Repo().tags[-1]} ...")
 
     ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
     for path in RELEASE_DIRECTORY.glob("*.zip*"):
@@ -198,4 +217,4 @@ if __name__ == "__main__":
         Path(__file__).parent / "pcb2blender_importer",
     )
 
-    print("... done.")
+    success("done.")
