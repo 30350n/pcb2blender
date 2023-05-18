@@ -14,6 +14,31 @@ from nodeitems_builtins import ShaderNodeCategory
 LAYER_BOARD_EDGE = "pcb_board_edge"
 LAYER_THROUGH_HOLES = "pcb_through_holes"
 
+KICAD_2_MAT4CAD = {
+    "PIN-01":            "special-pins_silver-default",
+    "PIN-02":            "special-pins_gold-default",
+
+    "MET-BRONZE":        "metal-bronze-semi_matte",
+    "MET-COPPER":        "metal-copper-semi_matte",
+
+    "IC-BODY-EPOXY-04":  "plastic-traffic_black-matte",
+    "IC-LABEL-01":       "plastic-grey_white-semi_matte",
+    "RES-THT-01":        "plastic-beige-semi_matte",
+    "RES-SMD-01":        "plastic-iron_grey-semi_matte",
+    "CAP-CERAMIC-05":    "plastic-signal_grey-semi_matte",
+    "CAP-CERAMIC-06":    "plastic-grey_beige-semi_matte",
+    "BOARD-BLACK-03":    "plastic-mouse_grey-semi_matte",
+    "PLASTIC-BLUE-01":   "plastic-brilliant_blue-semi_matte",
+    "PLASTIC-ORANGE-01": "plastic-saffron_yellow-semi_matte",
+    "PLASTIC-WHITE-01":  "plastic-pure_white-semi_matte",
+    "PLASTIC-YELLOW-01": "plastic-zinc_yellow-semi_matte",
+    "PLASTIC-GREEN-01":  "plastic-pale_green-semi_matte",
+    "RED-BODY":          "plastic-salmon_orange-semi_matte",
+
+    "GLASS-13":          "plastic_transparent-turquoise_blue-diffused",
+    "LED-RED":           "plastic_transparent-orient_red-diffused",
+}
+
 def merge_materials(meshes):
     merged_materials = {}
     for mesh in meshes:
@@ -33,50 +58,10 @@ def enhance_materials(materials):
 
         if mat4cad_mat := Material.from_name(material.name):
             pass
+        elif mat4cad_mat := Material.from_name(KICAD_2_MAT4CAD.get(material.name, "")):
+            pass
         else:
-            match material.name:
-                case "PIN-01":
-                    mat4cad_name = "special-pins_silver-default"
-                case "PIN-02":
-                    mat4cad_name = "special-pins_gold-default"
-                case "IC-BODY-EPOXY-04":
-                    mat4cad_name = "plastic-traffic_black-matte"
-                case "IC-LABEL-01":
-                    mat4cad_name = "plastic-grey_white-semi_matte"
-                case "RES-THT-01":
-                    mat4cad_name = "plastic-beige-semi_matte"
-                case "RES-SMD-01":
-                    mat4cad_name = "plastic-iron_grey-semi_matte"
-                case "CAP-CERAMIC-05":
-                    mat4cad_name = "plastic-signal_grey-semi_matte"
-                case "CAP-CERAMIC-06":
-                    mat4cad_name = "plastic-grey_beige-semi_matte"
-                case "BOARD-BLACK-03":
-                    mat4cad_name = "plastic-mouse_grey-semi_matte"
-                case "GLASS-13":
-                    mat4cad_name = "plastic_transparent-turquoise_blue-diffused"
-                case "LED-RED":
-                    mat4cad_name = "plastic_transparent-orient_red-diffused"
-                case "MET-BRONZE":
-                    mat4cad_name = "metal-bronze-semi_matte"
-                case "MET-COPPER":
-                    mat4cad_name = "metal-copper-semi_matte"
-                case "PLASTIC-BLUE-01":
-                    mat4cad_name = "plastic-brilliant_blue-semi_matte"
-                case "PLASTIC-ORANGE-01":
-                    mat4cad_name = "plastic-saffron_yellow-semi_matte"
-                case "PLASTIC-WHITE-01":
-                    mat4cad_name = "plastic-pure_white-semi_matte"
-                case "PLASTIC-YELLOW-01":
-                    mat4cad_name = "plastic-zinc_yellow-semi_matte"
-                case "PLASTIC-GREEN-01":
-                    mat4cad_name = "plastic-pale_green-semi_matte"
-                case "RED-BODY":
-                    mat4cad_name = "plastic-salmon_orange-semi_matte"
-                case _:
-                    continue
-
-            mat4cad_mat = Material.from_name(mat4cad_name)
+            continue
 
         mat4cad_mat.setup_node_tree(material.node_tree)
 

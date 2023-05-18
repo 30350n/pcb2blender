@@ -7,7 +7,7 @@ from .importer import MM_TO_M, PCB_THICKNESS_MM
 from .custom_node_utils import setup_node_tree
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
-    """Add aA solder joint"""
+    """Add a solder joint"""
     bl_idname = "pcb2blender.solder_joint_add"
     bl_label = "Solder Joint"
     bl_options = {"REGISTER", "UNDO"}
