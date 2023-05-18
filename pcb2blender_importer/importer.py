@@ -371,6 +371,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 cut_material_index = len(board_obj.material_slots) + 1
                 boundingbox = self.get_boundingbox(context, board.bounds, cut_material_index)
                 self.cut_object(context, board_obj, boundingbox, "INTERSECT")
+                bpy.data.objects.remove(boundingbox)
 
                 # cleanup and reapply board edge vcs on the newly cut edge faces
                 bm = bmesh.new()
@@ -393,7 +394,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     for edge in face.edges:
                         if not board_edge_faces.issuperset(edge.link_faces):
                             continue
-                        if edge.calc_face_angle(0) < radians(5.0):
+                        if edge.calc_face_angle(0) < ANGLE_LIMIT:
                             continue
                         keep_verts = keep_verts.union(edge.verts)
 
@@ -426,11 +427,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 context.view_layer.objects.active = board_obj
 
                 bpy.ops.object.mode_set(mode="EDIT")
-                bpy.ops.mesh.beautify_fill(angle_limit=radians(1.0))
+                bpy.ops.mesh.beautify_fill(angle_limit=ANGLE_LIMIT)
                 bpy.ops.mesh.tris_convert_to_quads()
                 bpy.ops.object.mode_set(mode="OBJECT")
-
-                bpy.data.objects.remove(boundingbox)
 
                 offset = board.bounds[0].to_3d() * MM_TO_M
                 board_obj.data.transform(Matrix.Translation(-offset))
@@ -711,9 +710,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         context.view_layer.objects.active = obj
 
         bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.dissolve_limited(angle_limit=radians(1.0))
+        bpy.ops.mesh.dissolve_limited(angle_limit=ANGLE_LIMIT)
         bpy.ops.mesh.quads_convert_to_tris()
-        bpy.ops.mesh.beautify_fill(angle_limit=radians(1.0))
+        bpy.ops.mesh.beautify_fill(angle_limit=ANGLE_LIMIT)
         bpy.ops.mesh.tris_convert_to_quads()
         bpy.ops.object.mode_set(mode="OBJECT")
 
@@ -891,6 +890,8 @@ MATRIX_FIX_SCALE_INV = Matrix.Scale(FIX_X3D_SCALE, 4).inverted()
 
 PCB_THICKNESS_MM = 1.6
 PCB_THICKNESS = PCB_THICKNESS_MM * MM_TO_M
+
+ANGLE_LIMIT = radians(0.1)
 
 regex_filter_components = re.compile(
     r"(?P<prefix>Transform\s*{\s*"
