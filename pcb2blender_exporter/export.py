@@ -35,7 +35,7 @@ class BoardDef:
 
 def export_pcb3d(filepath, boarddefs):
     init_tempdir()
-    
+
     wrl_path = get_temppath(PCB)
     components_path = get_temppath(COMPONENTS)
     pcbnew.ExportVRML(wrl_path, 0.001, True, True, components_path, 0.0, 0.0)
@@ -149,11 +149,11 @@ def get_boarddefs(board):
 
         if onto != "ONTO":
             continue
-        
+
         other_name = sanitized(other)
         target_name = sanitized(target)
 
-        if not other_name in set(boarddefs) | {"FPNL"} or not target_name in boarddefs:
+        if other_name not in set(boarddefs) | {"FPNL"} or target_name not in boarddefs:
             continue
 
         stack_pos = stacks.pop(stack_str)
@@ -196,7 +196,7 @@ def export_layers(board, bounds, output_directory: Path):
         filepath.write_text(content)
 
 def sanitized(name):
-    return re.sub("[\W]+", "_", name)
+    return re.sub(r"[\W]+", "_", name)
 
 def get_tempdir():
     return Path(tempfile.gettempdir()) / "pcb2blender_tmp"
@@ -213,4 +213,4 @@ def init_tempdir():
 svg_header_regex = re.compile(
     r"<svg([^>]*)width=\"[^\"]*\"[^>]*height=\"[^\"]*\"[^>]*viewBox=\"[^\"]*\"[^>]*>"
 )
-svg_header_sub = "<svg\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
+svg_header_sub = "<svg\\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"

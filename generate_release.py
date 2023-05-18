@@ -5,12 +5,13 @@ from git import Repo
 from zipfile import ZipFile, ZIP_DEFLATED
 from hashlib import sha256
 from itertools import chain
+from autopep8 import main as autopep8
 import json, shutil, requests, re
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
-DESCRIPTION = re.sub(r"\n([^\n])", " \g<1>", """
+DESCRIPTION = re.sub(r"\n([^\n])", " \\g<1>", """
 The pcb2blender workflow lets you create professionally looking product renders of all your
 KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into
 Blender and start creating!
@@ -52,8 +53,8 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     version, kicad_version, _ = latest_tag.name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "\
-            f"'{package_version}'")
+        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "
+              f"'{package_version}'")
 
     RELEASE_DIRECTORY.mkdir(exist_ok=True)
     zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
@@ -118,16 +119,16 @@ def generate_blender_addon(path, extra_files=[]):
     version, _, blender_version = latest_tag.name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "\
-            f"'{package_version}'")
+        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "
+              f"'{package_version}'")
 
     if version[1:] != (bl_info_version := get_bl_info_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match addon version "\
-            f"in bl_info '{bl_info_version}'")
+        print(f"warning: tag addon version '{version[1:]}' doesn't match addon version "
+              f"in bl_info '{bl_info_version}'")
 
     if blender_version[1:] != (bl_info_bversion := get_bl_info_bversion(path)):
-        print(f"warning: tag blender version '{version[1:]}' doesn't match blender version "\
-            f"in bl_info '{bl_info_bversion}'")
+        print(f"warning: tag blender version '{version[1:]}' doesn't match blender version "
+              f"in bl_info '{bl_info_bversion}'")
 
     RELEASE_DIRECTORY.mkdir(exist_ok=True)
     zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
@@ -162,13 +163,16 @@ bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\
 package_version_regex  = re.compile(r"__version__\s*=\s*\"([^\"]*)\"")
 
 if __name__ == "__main__":
+    print("running autopep8 ...")
+    autopep8(["", "--recursive", "--in-place", "."])
+
     if Repo().head.is_detached:
         print("error: repo is in detached head state")
         exit()
     if Repo().is_dirty():
         print("error: repo is dirty (stash changes before generating a release)")
         exit()
-    if not "up to date" in Repo().git.status():
+    if "up to date" not in Repo().git.status():
         print("error: current commit is not pushed")
         exit()
     if Repo().tags[-1].commit != Repo().commit():

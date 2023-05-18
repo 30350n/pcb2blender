@@ -21,7 +21,7 @@ class SettingsDialog(wx.Dialog):
         else:
             wx.MessageBox(
                 f"Invalid path \"{path.parent}\"!", caption="Error",
-                style=wx.CENTER|wx.ICON_ERROR|wx.OK
+                style=wx.CENTER | wx.ICON_ERROR | wx.OK
             )
 
     def init_panel(self, boarddefs, ignored):
@@ -32,18 +32,18 @@ class SettingsDialog(wx.Dialog):
         column = wx.BoxSizer()
 
         text_export_as = wx.StaticText(panel, label="Export as")
-        column.Add(text_export_as, flag=wx.ALL|wx.ALIGN_CENTER, border=5)
+        column.Add(text_export_as, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
         self.file_picker = wx.FilePickerCtrl(
-                panel, message="Export as",
-                wildcard="PCB 3D Model (.pcb3d)|*.pcb3d",
-                style=wx.FLP_SAVE|wx.FLP_USE_TEXTCTRL|wx.FLP_OVERWRITE_PROMPT,
-                size=(300, 25)
+            panel, message="Export as",
+            wildcard="PCB 3D Model (.pcb3d)|*.pcb3d",
+            style=wx.FLP_SAVE | wx.FLP_USE_TEXTCTRL | wx.FLP_OVERWRITE_PROMPT,
+            size=(300, 25)
         )
-        column.Add(self.file_picker, proportion=1, flag=wx.ALL|wx.ALIGN_CENTER, border=5)
+        column.Add(self.file_picker, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
-        settings.Add(column, flag=wx.EXPAND|wx.ALL, border=5)
-        rows.Add(settings, flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, border=5)
+        settings.Add(column, flag=wx.EXPAND | wx.ALL, border=5)
+        rows.Add(settings, flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         info = wx.StaticBoxSizer(wx.StaticBox(panel, label="Info"), orient=wx.VERTICAL)
 
@@ -63,7 +63,7 @@ class SettingsDialog(wx.Dialog):
 
             info.Add(wx.StaticText(panel, label=label), flag=wx.ALL, border=5)
 
-        rows.Add(info, flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, border=5)
+        rows.Add(info, flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         if ignored:
             warning = wx.StaticBoxSizer(
@@ -74,7 +74,7 @@ class SettingsDialog(wx.Dialog):
             for name in ignored:
                 warning.Add(wx.StaticText(panel, label="    " + name), flag=wx.ALL, border=5)
 
-            rows.Add(warning, flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, border=5)
+            rows.Add(warning, flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         hint = wx.StaticBoxSizer(wx.StaticBox(panel, label="Hint"), orient=wx.VERTICAL)
         boarddef_hint = ""\
@@ -87,18 +87,18 @@ class SettingsDialog(wx.Dialog):
             "where you want the top left corner of A to be.\n"\
             "(zoffset is given in mm, 10.0 works great for 2.54mm headers and sockets)"
         boarddef_hint_text = wx.StaticText(panel, label=boarddef_hint)
-        boarddef_hint_text.Wrap(400) #rows.GetSize().x
+        boarddef_hint_text.Wrap(400)
         hint.Add(boarddef_hint_text, flag=wx.ALL, border=5)
-        rows.Add(hint, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=5)
+        rows.Add(hint, flag=wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         buttons = wx.BoxSizer()
         button_cancel = wx.Button(panel, id=wx.ID_CANCEL, label="Cancel", size=(85, 26))
-        buttons.Add(button_cancel, flag=wx.ALL|wx.ALIGN_CENTER, border=5)
+        buttons.Add(button_cancel, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
         button_export = wx.Button(panel, id=wx.ID_OK, label="Export", size=(85, 26))
         button_export.Bind(wx.EVT_BUTTON, self.on_export)
-        buttons.Add(button_export, flag=wx.ALL|wx.ALIGN_CENTER, border=5)
+        buttons.Add(button_export, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
-        rows.Add(buttons, flag=wx.ALL|wx.ALIGN_RIGHT, border=5)
+        rows.Add(buttons, flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
 
         panel.SetSizer(rows)
 

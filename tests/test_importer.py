@@ -41,7 +41,7 @@ def test_importer(path, kwargs):
     result = bpy.ops.pcb2blender.import_pcb3d(filepath=str(path), **kwargs)
     assert result == {"FINISHED"}
     assert len(bpy.context.view_layer.objects) > 0
-    assert bpy.context.object != None
+    assert bpy.context.object is not None
 
 def test_load_file():
     test_path = str(Path(gettempdir()) / "pcb2blender_test.blend")

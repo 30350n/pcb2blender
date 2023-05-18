@@ -93,13 +93,13 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
         "paste": ("ShaderNodeTexImage", {"location": (-500, -440), "hide": True,
             "interpolation": "Cubic", "image": images["Paste"]}, {}),
 
-        "seperate_cu":    ("ShaderNodeSeparateRGB", {"location": (-200, -320), "hide": True}, 
+        "seperate_cu":    ("ShaderNodeSeparateRGB", {"location": (-200, -320), "hide": True},
             {"Image": ("cu",    "Color")}),
-        "seperate_mask":  ("ShaderNodeSeparateRGB", {"location": (-200, -360), "hide": True}, 
+        "seperate_mask":  ("ShaderNodeSeparateRGB", {"location": (-200, -360), "hide": True},
             {"Image": ("mask",  "Color")}),
-        "seperate_silks": ("ShaderNodeSeparateRGB", {"location": (-200, -400), "hide": True}, 
+        "seperate_silks": ("ShaderNodeSeparateRGB", {"location": (-200, -400), "hide": True},
             {"Image": ("silks", "Color")}),
-        "seperate_paste": ("ShaderNodeSeparateRGB", {"location": (-200, -440), "hide": True}, 
+        "seperate_paste": ("ShaderNodeSeparateRGB", {"location": (-200, -440), "hide": True},
             {"Image": ("paste", "Color")}),
 
         "base_material": ("ShaderNodeBsdfMat4cad", {"location": (-260, 0),
@@ -272,7 +272,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         nodes = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector" : ("tex_coord", "Object")}),
+                {"Vector": ("tex_coord", "Object")}),
             "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
                 {0: ("separate_position", "Z"), 1: 0.0}),
 
@@ -391,7 +391,7 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "bump": ("ShaderNodeBump", {}, {
                 "Strength": ("bump_strength", 0), "Distance": 1e-3,
                 "Height": ("noise", 0), "Normal": ("inputs", "Normal")}),
-            
+
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
@@ -442,7 +442,7 @@ class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomG
                 "Color1": ("base_color", 0), "Color2": ("bump_color", 0)}),
             "ssr": ("ShaderNodeBrightContrast", {},
                 {"Color": ("color", 0), "Bright": 0.1}),
-            
+
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
@@ -523,7 +523,7 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
         nodes = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector" : ("tex_coord", "Object")}),
+                {"Vector": ("tex_coord", "Object")}),
             "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
                 {0: ("separate_position", "Z"), 1: 0.0}),
 
@@ -535,7 +535,7 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
                 "Color1": ("inputs", "F_SilkS"), "Color2": ("inputs", "B_SilkS")}),
             "paste": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
                 "Color1": ("inputs", "F_Paste"), "Color2": ("inputs", "B_Paste")}),
-            
+
             "cu_exposed": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
                 {0: ("cu", 0), 1: ("mask", 0)}),
             "silks_cut": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},

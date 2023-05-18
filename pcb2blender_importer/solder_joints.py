@@ -50,7 +50,8 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         hole_size = np.array(self.hole_size)
 
         if self.pad_type == "THT":
-            verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness, PCB_THICKNESS_MM)
+            verts, faces = solder_joint_tht(
+                pad_size, hole_size, self.roundness, PCB_THICKNESS_MM)
         elif self.pad_type == "SMD":
             verts, faces = solder_joint_smd(pad_size, self.roundness, PCB_THICKNESS_MM)
 
@@ -173,7 +174,7 @@ def add_octagon_layer(verts, faces, size, z, roundness=0.5, fill=False):
         (-(half_size[0] - r_offset), -(half_size[1]           ), z),
         (-(half_size[0]           ), -(half_size[1] - r_offset), z),
         (-(half_size[0]           ),  (half_size[1] - r_offset), z),
-        (-(half_size[0] - r_offset),  (half_size[1]           ), z),    
+        (-(half_size[0] - r_offset),  (half_size[1]           ), z),
     ))
 
     if len(verts) > 0:

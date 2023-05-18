@@ -112,8 +112,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
     add_solder_joints: EnumProperty(name="Add Solder Joints", default="SMART",
         items=(
             ("NONE", "None", "Do not add any solder joints"),
-            ("SMART", "Smart", "Only add solder joints to footprints that have THT/SMD "\
-                "attributes set and that have 3D models and only to pads which have a "\
+            ("SMART", "Smart", "Only add solder joints to footprints that have THT/SMD "
+                "attributes set and that have 3D models and only to pads which have a "
                 "solder paste layer (for SMD pads)"),
             ("ALL", "All", "Add solder joints to all pads")))
 
@@ -173,7 +173,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         if self.stack_boards:
             for board in pcb.boards.values():
                 for (name, offset) in board.stacked_boards:
-                    if not name in pcb.boards:
+                    if name not in pcb.boards:
                         self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
                         continue
 
@@ -384,7 +384,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     if face.material_index == cut_material_index:
                         face[board_edge] = 1
                         face.material_index = 0
-                
+
                 board_edge_faces = {face for face in bm.faces if face[board_edge]}
                 board_edge_verts = {vert for face in board_edge_faces for vert in face.verts}
 
@@ -445,7 +445,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         if self.import_components and self.component_cache:
             match = regex_filter_components.search(pcb.content)
             matrix_all = match2matrix(match)
-            
+
             for match_instance in regex_component.finditer(match.group("instances")):
                 matrix_instance = match2matrix(match_instance)
                 url = match_instance.group("url")
@@ -467,7 +467,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     if pad.pad_type == PadType.SMD and not pad.has_paste:
                         continue
 
-                if not pad.pad_type in {PadType.THT, PadType.SMD}:
+                if pad.pad_type not in {PadType.THT, PadType.SMD}:
                     continue
                 if pad.shape == PadShape.UNKNOWN or pad.drill_shape == DrillShape.UNKNOWN:
                     continue
@@ -486,8 +486,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     case PadShape.ROUNDRECT:
                         roundness = pad.roundness * 2.0
                     case PadShape.TRAPEZOID | PadShape.CHAMFERED_RECT | PadShape.CUSTOM:
-                        print(f"skipping solder joint for '{pad_name}', "\
-                            f"unsupported shape '{pad.shape.name}'")
+                        print(f"skipping solder joint for '{pad_name}', "
+                              f"unsupported shape '{pad.shape.name}'")
                         continue
 
                 cache_id = (pad_type, tuple(pad_size), hole_shape, tuple(hole_size), roundness)
@@ -540,7 +540,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                     name, parent_board = closest
                     self.warning(
-                        f"assigning \"{obj.name}\" (out of bounds) " \
+                        f"assigning \"{obj.name}\" (out of bounds) "
                         f"to closest board \"{name}\"")
 
                 obj.location.xy -= parent_board.bounds[0] * MM_TO_M
@@ -554,7 +554,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         with file.open(PCB) as pcb_file:
             pcb_file_content = pcb_file.read().decode("UTF-8")
             with open(extract_dir / PCB, "wb") as filtered_file:
-                filtered = regex_filter_components.sub("\g<prefix>", pcb_file_content)
+                filtered = regex_filter_components.sub("\\g<prefix>", pcb_file_content)
                 filtered_file.write(filtered.encode("UTF-8"))
 
         components = list({
@@ -640,7 +640,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         MARGIN_MM = -0.01
         size = Vector((1.0, -1.0, 1.0)) * (bounds[1] - bounds[0]).to_3d()
-        scale =  (size + 2.0 * Vector((MARGIN_MM, MARGIN_MM, 5.0))) * MM_TO_M
+        scale = (size + 2.0 * Vector((MARGIN_MM, MARGIN_MM, 5.0))) * MM_TO_M
         translation = (bounds[0] - Vector((MARGIN_MM, -MARGIN_MM))).to_3d() * MM_TO_M
         matrix_scale = Matrix.Diagonal(scale).to_4x4()
         matrix_offset = Matrix.Translation(translation)
@@ -668,7 +668,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         offset = np.array((layers_bounds[0], -layers_bounds[1]))
         size = np.array((layers_bounds[2], layers_bounds[3]))
-        uvs = (vertices[:,:2][indices] * M_TO_MM - offset) / size + np.array((0, 1))
+        uvs = (vertices[:, :2][indices] * M_TO_MM - offset) / size + np.array((0, 1))
 
         uv_layer = mesh.uv_layers[0]
         uv_layer.uv.foreach_set("vector", uvs.flatten())
