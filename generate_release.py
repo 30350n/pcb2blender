@@ -13,39 +13,45 @@ import json, shutil, requests, re, sys
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
-DESCRIPTION = re.sub(r"\n([^\n])", " \\g<1>", """
-The pcb2blender workflow lets you create professionally looking product renders of all your
-KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into
-Blender and start creating!
+def generate_release():
+    info("running autopep8 ... ", end="")
+    autopep8(["", "--recursive", "--in-place", "."])
+    if Repo().is_dirty():
+        error("repo is dirty (stash changes before generating a release)")
+    success("done.")
 
-(Note for Linux/macOS users: If you run into any issues, make sure you're running python 3.10).
-""").strip()
+    with patch.object(sys, "argv", ["", "-q"]):
+        info("running pytest ...")
+        if (exit_code := pytest()) != 0:
+            error(f"tests failed with {exit_code}")
 
-METADATA_CONTACT = {
-    "name": "Bobbe",
-    "contact": {
-        "web": "https://30350n.de/",
-        "github": "https://github.com/30350n",
-        "discord": "Bobbe#8552"
-    },
-}
+    if Repo().head.is_detached:
+        error("repo is in detached head state")
+    if "up to date" not in Repo().git.status():
+        error("current commit is not pushed")
+    if Repo().tags[-1].commit != Repo().commit():
+        error("current commit is not tagged")
 
-ORIGIN = "https://github.com/30350n/pcb2blender"
+    info(f"generating release for {Repo().tags[-1]} ... ", end="")
 
-METADATA = {
-    "$schema": "https://go.kicad.org/pcm/schemas/v1",
-    "name": "pcb2blender",
-    "description": "Export PCB 3D Models from Pcbnew to Blender",
-    "description_full": DESCRIPTION,
-    "identifier": "com.github.30350n.pcb2blender",
-    "type": "plugin",
-    "author": METADATA_CONTACT,
-    "maintainer": METADATA_CONTACT,
-    "license": "GPL-3.0",
-    "resources": {
-        "homepage": ORIGIN,
-    },
-}
+    ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
+    for path in RELEASE_DIRECTORY.glob("*.zip*"):
+        if not path.is_file():
+            continue
+        shutil.move(path, ARCHIVE_DIRECTORY / path.name)
+
+    generate_kicad_addon(
+        Path(__file__).parent / "pcb2blender_exporter",
+        METADATA,
+        "images/icon.png",
+        ["images/blender_icon_32x32.png"],
+    )
+
+    generate_blender_addon(
+        Path(__file__).parent / "pcb2blender_importer",
+    )
+
+    success("done.")
 
 def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     repo = Repo()
@@ -164,57 +170,54 @@ version_regex  = re.compile(r"bl_info\s*=\s*{[^}]*\"version\"\s*:\s*\(([^^\)]*)\
 bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
 package_version_regex  = re.compile(r"__version__\s*=\s*\"([^\"]*)\"")
 
+DESCRIPTION = re.sub(r"\n([^\n])", " \\g<1>", """
+The pcb2blender workflow lets you create professionally looking product renders of all your
+KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into
+Blender and start creating!
+
+(Note for Linux/macOS users: If you run into any issues, make sure you're running python 3.10).
+""").strip()
+
+METADATA_CONTACT = {
+    "name": "Bobbe",
+    "contact": {
+        "web": "https://30350n.de/",
+        "github": "https://github.com/30350n",
+        "discord": "Bobbe#8552"
+    },
+}
+
+ORIGIN = "https://github.com/30350n/pcb2blender"
+
+METADATA = {
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "pcb2blender",
+    "description": "Export PCB 3D Models from Pcbnew to Blender",
+    "description_full": DESCRIPTION,
+    "identifier": "com.github.30350n.pcb2blender",
+    "type": "plugin",
+    "author": METADATA_CONTACT,
+    "maintainer": METADATA_CONTACT,
+    "license": "GPL-3.0",
+    "resources": {
+        "homepage": ORIGIN,
+    },
+}
+
 COLOR_INFO = "\033[94m"
 COLOR_SUCCESS = "\033[92m"
 COLOR_ERROR = "\033[91m"
 COLOR_END = "\033[0m"
 
-def info(msg):
-    print(f"{COLOR_INFO}{msg}{COLOR_END}")
+def info(msg, end="\n"):
+    print(f"{COLOR_INFO}{msg}{COLOR_END}", end=end, flush=True)
 
 def success(msg):
     print(f"{COLOR_SUCCESS}{msg}{COLOR_SUCCESS}")
 
 def error(msg):
-    print(f"{COLOR_ERROR}error: {msg}{COLOR_END}", file=sys.stderr)
+    print(f"\n{COLOR_ERROR}error: {msg}{COLOR_END}", file=sys.stderr)
     exit()
 
 if __name__ == "__main__":
-    info("running autopep8 ...")
-    autopep8(["", "--recursive", "--in-place", "."])
-    if Repo().is_dirty():
-        error("repo is dirty (stash changes before generating a release)")
-    success("done.")
-
-    with patch.object(sys, "argv", ["", "-q"]):
-        info("running pytest ...")
-        if (exit_code := pytest()) != 0:
-            error(f"tests failed with {exit_code}")
-
-    if Repo().head.is_detached:
-        error("repo is in detached head state")
-    if "up to date" not in Repo().git.status():
-        error("current commit is not pushed")
-    if Repo().tags[-1].commit != Repo().commit():
-        error("current commit is not tagged")
-
-    info(f"generating release for {Repo().tags[-1]} ...")
-
-    ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
-    for path in RELEASE_DIRECTORY.glob("*.zip*"):
-        if not path.is_file():
-            continue
-        shutil.move(path, ARCHIVE_DIRECTORY / path.name)
-
-    generate_kicad_addon(
-        Path(__file__).parent / "pcb2blender_exporter",
-        METADATA,
-        "images/icon.png",
-        ["images/blender_icon_32x32.png"],
-    )
-
-    generate_blender_addon(
-        Path(__file__).parent / "pcb2blender_importer",
-    )
-
-    success("done.")
+    generate_release()
