@@ -319,6 +319,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             pcb_object.data.transform(Matrix.Diagonal((1, 1, 1.015, 1)))
 
             board_material = pcb_object.data.materials[0]
+            self.new_materials.discard(board_material)
             board_material.name = f"PCB_{filepath.stem}"
             setup_pcb_material(board_material.node_tree, images)
             if self.import_components and self.add_solder_joints != "NONE":
@@ -344,6 +345,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         # cut boards
 
+        # TODO: maybe handle this differently by always providing atleast one board def?
         if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name

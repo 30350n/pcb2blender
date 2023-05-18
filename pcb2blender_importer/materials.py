@@ -1,11 +1,11 @@
-from .mat4cad.core import Material, rgb2hex, hex2rgb, srgb2lin
+from .mat4cad.core import Material, rgb2hex, hex2rgb, srgb2lin, lin2srgb
 from .mat4cad.colors import PCB_YELLOW
 from .mat4cad.blender import register as register_mat4cad, unregister as unregister_mat4cad
 from .custom_node_utils import *
 
 import bpy
 from bpy.props import EnumProperty
-from mathutils import Vector
+from mathutils import Vector, Color
 
 from bpy.types import ShaderNodeCustomGroup
 from nodeitems_utils import NodeItem
@@ -55,15 +55,25 @@ def enhance_materials(materials):
     for material in materials:
         if not material.use_nodes:
             continue
+        node_tree = material.node_tree
 
         if mat4cad_mat := Material.from_name(material.name):
             pass
         elif mat4cad_mat := Material.from_name(KICAD_2_MAT4CAD.get(material.name, "")):
             pass
         else:
-            continue
+            shader_nodes = (node for node in node_tree.nodes if node.type == "BSDF_PRINCIPLED")
+            if not (node_shader := next(shader_nodes, None)):
+                continue
 
-        mat4cad_mat.setup_node_tree(material.node_tree)
+            color = Color(node_shader.inputs["Base Color"].default_value[:3])
+            probably_metal = color.s < 0.1 and color.v > 0.25
+            base_material = "metal" if probably_metal else "plastic"
+            color_hex = rgb2hex(lin2srgb(color))
+
+            mat4cad_mat = Material.from_name(f"{base_material}-custom_{color_hex}-semi_matte")
+
+        mat4cad_mat.setup_node_tree(node_tree)
 
 def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.types.Image]):
     node_tree.nodes.clear()
