@@ -95,6 +95,20 @@ class Pad:
     drill_shape: DrillShape
     drill_size: Vector
 
+    @staticmethod
+    def from_bytes(data):
+        unpacked = struct.unpack("!ff????BBffffBff", data)
+        return Pad(
+            Vector((unpacked[0], -unpacked[1])),
+            *unpacked[2:6],
+            PadType(unpacked[6]),
+            PadShape(unpacked[7]),
+            Vector(unpacked[8:10]),
+            *unpacked[10:12],
+            DrillShape(unpacked[12]),
+            Vector(unpacked[13:15]),
+        )
+
 class KiCadColor(Enum):
     CUSTOM = 0
     GREEN  = 1
@@ -658,21 +672,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         else:
             for path in pads_path.iterdir():
                 try:
-                    pad_struct = struct.unpack("!ff????BBffffBff", path.read_bytes())
+                    pads[path.name] = Pad.from_bytes(path.read_bytes())
                 except struct.error:
                     self.warning(f"old file format: failed to parse pads")
                     break
-
-                pads[path.name] = Pad(
-                    Vector((pad_struct[0], -pad_struct[1])),
-                    *pad_struct[2:6],
-                    PadType(pad_struct[6]),
-                    PadShape(pad_struct[7]),
-                    Vector(pad_struct[8:10]),
-                    *pad_struct[10:12],
-                    DrillShape(pad_struct[12]),
-                    Vector(pad_struct[13:15]),
-                )
 
         return PCB3D(pcb_file_content, components, layers_bounds, stackup, boards, pads)
 
