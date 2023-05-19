@@ -18,7 +18,6 @@ def generate_release():
     autopep8(["", "--recursive", "--in-place", "."])
     if Repo().is_dirty():
         error("repo is dirty (stash changes before generating a release)")
-    success("done.")
 
     with patch.object(sys, "argv", ["", "-q"]):
         info("running pytest ...")
@@ -215,7 +214,7 @@ def info(msg, end="\n"):
     print(f"{COLOR_INFO}{msg}{COLOR_END}", end=end, flush=True)
 
 def hint(msg):
-    print(f"{COLOR_HINT}({msg}){COLOR_END})")
+    print(f"{COLOR_HINT}({msg}){COLOR_END}")
 
 def success(msg):
     print(f"{COLOR_SUCCESS}{msg}{COLOR_END}")
