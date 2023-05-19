@@ -237,7 +237,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
                 light_color = hex2rgb("dac92b")
                 dark_color  = hex2rgb("687c19")
             case "BLUE":
-                light_color = hex2rgb("116cc2")
+                light_color = hex2rgb("0d5eaa")
                 dark_color  = hex2rgb("053059")
             case "PURPLE":
                 light_color = hex2rgb("6b2baa")
