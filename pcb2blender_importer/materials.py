@@ -7,7 +7,7 @@ import bpy
 from bpy.props import EnumProperty
 from mathutils import Vector, Color
 
-from bpy.types import ShaderNodeCustomGroup
+from bpy.types import ShaderNodeCustomGroup, NodeTree
 from nodeitems_utils import NodeItem
 from nodeitems_builtins import ShaderNodeCategory
 
@@ -75,8 +75,23 @@ def enhance_materials(materials):
 
         mat4cad_mat.setup_node_tree(node_tree)
 
-def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.types.Image]):
+def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], stackup):
     node_tree.nodes.clear()
+
+    surface_finish = stackup.surface_finish.name
+
+    soldermask = stackup.mask_color.name
+    soldermask_inputs = {}
+    if soldermask == "CUSTOM":
+        color = srgb2lin(stackup.mask_color_custom)
+        soldermask_inputs = {"Light Color": [*color, 1.0], "Dark Color":  [*(color * 0.2), 1.0]}
+
+    silkscreen = stackup.silks_color.name
+    silkscreen_inputs = {}
+    if silkscreen in SILKS_COLOR_MAP or silkscreen == "CUSTOM":
+        silkscreen = "CUSTOM"
+        color = srgb2lin(SILKS_COLOR_MAP.get(silkscreen, stackup.silks_color_custom))
+        silkscreen_inputs = {"Color": [*color, 1.0], "Roughness": 0.25}
 
     nodes = {
         "cu":    ("ShaderNodeTexImage", {"location": (-500, -320), "hide": True,
@@ -99,12 +114,15 @@ def setup_pcb_material(node_tree: bpy.types.NodeTree, images: dict[str, bpy.type
 
         "base_material": ("ShaderNodeBsdfMat4cad", {"location": (-260, 0),
             "mat_base": "PCB", "mat_color": "PCB_YELLOW"}, {}),
-        "exposed_copper": ("ShaderNodeBsdfPcbSurfaceFinish", {"location": (-500, 0)}, {}),
-        "solder_mask": ("ShaderNodeBsdfPcbSolderMask", {"location": (-740, 0)},
-            {"F_Cu": ("seperate_cu", "R"), "B_Cu": ("seperate_cu", "G")}),
+        "exposed_copper": ("ShaderNodeBsdfPcbSurfaceFinish", {"location": (-500, 0),
+            "surface_finish": surface_finish}, {}),
+        "solder_mask": ("ShaderNodeBsdfPcbSolderMask", {"location": (-740, 0),
+            "soldermask": soldermask},
+            {"F_Cu": ("seperate_cu", "R"), "B_Cu": ("seperate_cu", "G"), **soldermask_inputs}),
         "board_edge": ("ShaderNodeBsdfPcbBoardEdge", {"location": (-740, -280)},
             {"Mask Color": ("solder_mask", "Color")}),
-        "silkscreen": ("ShaderNodeBsdfPcbSilkscreen", {"location": (-980, 0)}, {}),
+        "silkscreen": ("ShaderNodeBsdfPcbSilkscreen", {"location": (-980, 0),
+            "silkscreen": silkscreen}, {**silkscreen_inputs}),
         "solder": ("ShaderNodeBsdfSolder", {"location": (-1220, 0)}, {}),
 
         "shader": ("ShaderNodePcbShader", {}, {
@@ -221,6 +239,9 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             case "BLUE":
                 light_color = hex2rgb("116cc2")
                 dark_color  = hex2rgb("053059")
+            case "PURPLE":
+                light_color = hex2rgb("6b2baa")
+                dark_color  = hex2rgb("361359")
             case "WHITE":
                 light_color = hex2rgb("d3cfc9")
                 dark_color  = hex2rgb("e1dddc")
@@ -236,7 +257,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         if not self.soldermask == "CUSTOM":
             self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
             self.inputs["Dark Color"].default_value  = (*srgb2lin(dark_color),  1.0)
-            self.inputs["Roughness"].default_value   = roughness
+            self.inputs["Roughness"].default_value = roughness
 
         hidden = self.soldermask != "CUSTOM"
         for input_name in ("Light Color", "Dark Color", "Roughness"):
@@ -247,6 +268,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ("RED",    "Red",    ""),
         ("YELLOW", "Yellow", ""),
         ("BLUE",   "Blue",   ""),
+        ("PURPLE", "Purple", ""),
         ("WHITE",  "White",  ""),
         ("BLACK",  "Black",  ""),
         ("MATTE_BLACK",  "Matte Black",  ""),
@@ -341,6 +363,14 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
 
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
+
+SILKS_COLOR_MAP = {
+    "GREEN":  hex2rgb("28a125"),
+    "RED":    hex2rgb("e50007"),
+    "BLUE":   hex2rgb("116cc2"),
+    "PURPLE": hex2rgb("4f33c2"),
+    "YELLOW": hex2rgb("dac92b"),
+}
 
 class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Silkscreen BSDF"

@@ -5,12 +5,14 @@ import tempfile, shutil, struct, re
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from dataclasses import dataclass, field
-from typing import List
+from enum import IntEnum
+from typing import List, Tuple
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
 LAYERS = "layers"
 LAYERS_BOUNDS = "bounds"
+LAYERS_STACKUP = "stackup"
 BOARDS = "boards"
 BOUNDS = "bounds"
 STACKED = "stacked_"
@@ -25,13 +27,53 @@ SVG_MARGIN = 1.0 # mm
 @dataclass
 class StackedBoard:
     name: str
-    offset: List[float]
+    offset: Tuple[float, float, float]
 
 @dataclass
 class BoardDef:
     name: str
-    bounds: List[float]
+    bounds: Tuple[float, float, float, float]
     stacked_boards: List[StackedBoard] = field(default_factory=list)
+
+class KiCadColor(IntEnum):
+    CUSTOM = 0
+    GREEN  = 1
+    RED    = 2
+    BLUE   = 3
+    PURPLE = 4
+    BLACK  = 5
+    WHITE  = 6
+    YELLOW = 7
+
+class SurfaceFinish(IntEnum):
+    HASL = 0
+    ENIG = 1
+    NONE = 2
+
+SURFACE_FINISH_MAP = {
+    "ENIG": SurfaceFinish.ENIG,
+    "ENEPIG": SurfaceFinish.ENIG,
+    "Hard gold": SurfaceFinish.ENIG,
+    "HT_OSP": SurfaceFinish.NONE,
+    "OSP": SurfaceFinish.NONE,
+}
+
+@dataclass
+class Stackup:
+    thickness_mm: float = 1.6
+    mask_color: KiCadColor = KiCadColor.GREEN
+    mask_color_custom: Tuple[int, int, int] = (0, 0, 0)
+    silks_color: KiCadColor = KiCadColor.WHITE
+    silks_color_custom: Tuple[int, int, int] = (0, 0, 0)
+    surface_finish: SurfaceFinish = SurfaceFinish.HASL
+
+    def pack(self) -> bytes:
+        return struct.pack("!fbBBBbBBBb",
+            self.thickness_mm,
+            self.mask_color, *self.mask_color_custom,
+            self.silks_color, *self.silks_color_custom,
+            self.surface_finish,
+        )
 
 def export_pcb3d(filepath, boarddefs):
     init_tempdir()
@@ -52,26 +94,26 @@ def export_pcb3d(filepath, boarddefs):
 
     with ZipFile(filepath, mode="w", compression=ZIP_DEFLATED) as file:
         # always ensure the COMPONENTS, LAYERS and BOARDS directories are created
-        file.writestr(COMPONENTS + "/", "")
-        file.writestr(LAYERS + "/", "")
-        file.writestr(BOARDS + "/", "")
+        file.writestr(f"{COMPONENTS}/", "")
+        file.writestr(f"{LAYERS}/", "")
+        file.writestr(f"{BOARDS}/", "")
 
         file.write(wrl_path, PCB)
         for path in components_path.glob("**/*.wrl"):
-            file.write(path, str(Path(COMPONENTS) / path.name))
+            file.write(path, f"{COMPONENTS}/{path.name}")
 
         for path in layers_path.glob("**/*.svg"):
-            file.write(path, str(Path(LAYERS) / path.name))
-        file.writestr(str(Path(LAYERS) / LAYERS_BOUNDS), struct.pack("!ffff", *bounds))
+            file.write(path, f"{LAYERS}/{path.name}")
+        file.writestr(f"{LAYERS}/{LAYERS_BOUNDS}", struct.pack("!ffff", *bounds))
+        file.writestr(f"{LAYERS}/{LAYERS_STACKUP}", get_stackup(board).pack())
 
         for boarddef in boarddefs.values():
-            subdir = Path(BOARDS) / boarddef.name
-
-            file.writestr(str(subdir / BOUNDS), struct.pack("!ffff", *boarddef.bounds))
+            subdir = f"{BOARDS}/{boarddef.name}"
+            file.writestr(f"{subdir}/{BOUNDS}", struct.pack("!ffff", *boarddef.bounds))
 
             for stacked in boarddef.stacked_boards:
                 file.writestr(
-                    str(subdir / (STACKED + stacked.name)),
+                    f"{subdir}/{STACKED}{stacked.name}",
                     struct.pack("!fff", *stacked.offset)
                 )
 
@@ -100,7 +142,7 @@ def export_pcb3d(filepath, boarddefs):
                     pad.GetDrillShape(),
                     *map(ToMM, pad.GetDrillSize()),
                 )
-                file.writestr(str(Path(PADS) / name), data)
+                file.writestr(f"{PADS}/{name}", data)
 
 def get_boarddefs(board):
     boarddefs = {}
@@ -168,6 +210,37 @@ def get_boarddefs(board):
 
     return boarddefs, ignored
 
+def get_stackup(board):
+    stackup = Stackup()
+
+    tmp_path = get_temppath("pcb2blender_tmp.kicad_pcb")
+    board.Save(str(tmp_path))
+    content = tmp_path.read_text()
+
+    if not (match := stackup_regex.search(content)):
+        return stackup
+    stackup_content = match.group(0)
+
+    if matches := stackup_thickness_regex.finditer(stackup_content):
+        stackup.thickness_mm = sum(float(match.group(1)) for match in matches)
+
+    if match := stackup_mask_regex.search(stackup_content):
+        stackup.mask_color, stackup.mask_color_custom = parse_kicad_color(match.group(1))
+
+    if match := stackup_silks_regex.search(stackup_content):
+        stackup.silks_color, stackup.silks_color_custom = parse_kicad_color(match.group(1))
+
+    if match := stackup_copper_finish_regex.search(stackup_content):
+        stackup.surface_finish = SURFACE_FINISH_MAP.get(match.group(1), SurfaceFinish.HASL)
+
+    return stackup
+
+def parse_kicad_color(string):
+    if string[0] == "#":
+        return KiCadColor.CUSTOM, hex2rgb(string[1:7])
+    else:
+        return KiCadColor[string.upper()], (0, 0, 0)
+
 def export_layers(board, bounds, output_directory: Path):
     plot_controller = PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
@@ -210,7 +283,20 @@ def init_tempdir():
         shutil.rmtree(tempdir)
     tempdir.mkdir()
 
+def hex2rgb(hex_string):
+    return (
+        int(hex_string[0:2], 16),
+        int(hex_string[2:4], 16),
+        int(hex_string[4:6], 16),
+    )
+
 svg_header_regex = re.compile(
     r"<svg([^>]*)width=\"[^\"]*\"[^>]*height=\"[^\"]*\"[^>]*viewBox=\"[^\"]*\"[^>]*>"
 )
 svg_header_sub = "<svg\\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
+
+stackup_regex = re.compile(r"\(stackup\s*((?:\s*\(.*\))*)\s*\)", re.MULTILINE)
+stackup_thickness_regex = re.compile(r"\(layer\s.*\(thickness\s+([^\)]*)\s*\)")
+stackup_mask_regex  = re.compile(r"\(layer\s+\"[FB].Mask\".*\(color\s+\"([^\)]*)\"\s*\)")
+stackup_silks_regex = re.compile(r"\(layer\s+\"[FB].SilkS\".*\(color\s+\"([^\)]*)\"\s*\)")
+stackup_copper_finish_regex = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")
