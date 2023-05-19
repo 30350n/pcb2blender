@@ -1,5 +1,5 @@
 [tool.autopep8]
 aggressive = 3
-max_line_length = 95
-ignore = "E121,E123,E126,E128,E133,E201,E202,E221,E241,E261,E302,E305,E401,E402"
+max_line_length = 96
+ignore = "E12,E13,E201,E202,E221,E241,E261,E302,E305,E401,E402"
 exclude = "site-packages"
