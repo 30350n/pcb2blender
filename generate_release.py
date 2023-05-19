@@ -32,7 +32,7 @@ def generate_release():
     if Repo().tags[-1].commit != Repo().commit():
         error("current commit is not tagged")
 
-    info(f"generating release for {Repo().tags[-1]} ... ", end="")
+    info(f"generating release for {Repo().tags[-1]} ... ")
 
     ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
     for path in RELEASE_DIRECTORY.glob("*.zip*"):
@@ -61,8 +61,8 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     version, kicad_version, _ = latest_tag.name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "
-              f"'{package_version}'")
+        warning(f"tag addon version '{version[1:]}' doesn't match package version "
+                f"'{package_version}'")
 
     RELEASE_DIRECTORY.mkdir(exist_ok=True)
     zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
@@ -114,7 +114,7 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
         if result.ok:
             metadata["versions"].append(result.json())
         else:
-            print(f"skipping {tag.name}, missing version.json")
+            hint(f"skipping {tag.name}, missing version.json")
 
     metadata_json = json.dumps(metadata, indent=4)
     (metadata_dir / "metadata.json").write_text(metadata_json)
@@ -127,16 +127,16 @@ def generate_blender_addon(path, extra_files=[]):
     version, _, blender_version = latest_tag.name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match package version "
-              f"'{package_version}'")
+        warning(f"tag addon version '{version[1:]}' doesn't match package version "
+                f"'{package_version}'")
 
     if version[1:] != (bl_info_version := get_bl_info_version(path)):
-        print(f"warning: tag addon version '{version[1:]}' doesn't match addon version "
-              f"in bl_info '{bl_info_version}'")
+        warning(f"tag addon version '{version[1:]}' doesn't match addon version "
+                f"in bl_info '{bl_info_version}'")
 
     if blender_version[1:] != (bl_info_bversion := get_bl_info_bversion(path)):
-        print(f"warning: tag blender version '{version[1:]}' doesn't match blender version "
-              f"in bl_info '{bl_info_bversion}'")
+        warning(f"tag blender version '{version[1:]}' doesn't match blender version "
+                f"in bl_info '{bl_info_bversion}'")
 
     RELEASE_DIRECTORY.mkdir(exist_ok=True)
     zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
@@ -205,15 +205,23 @@ METADATA = {
 }
 
 COLOR_INFO = "\033[94m"
+COLOR_HINT = "\033[2;3m"
 COLOR_SUCCESS = "\033[92m"
+COLOR_WARNING = "\033[93m"
 COLOR_ERROR = "\033[91m"
 COLOR_END = "\033[0m"
 
 def info(msg, end="\n"):
     print(f"{COLOR_INFO}{msg}{COLOR_END}", end=end, flush=True)
 
+def hint(msg):
+    print(f"{COLOR_HINT}({msg}){COLOR_END})")
+
 def success(msg):
-    print(f"{COLOR_SUCCESS}{msg}{COLOR_SUCCESS}")
+    print(f"{COLOR_SUCCESS}{msg}{COLOR_END}")
+
+def warning(msg):
+    print(f"{COLOR_WARNING}warning: {msg}{COLOR_END}")
 
 def error(msg):
     print(f"\n{COLOR_ERROR}error: {msg}{COLOR_END}", file=sys.stderr)
