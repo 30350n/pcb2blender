@@ -16,6 +16,7 @@ __version__ = "2.6"
 from .blender_addon_utils import add_dependencies, register_modules_factory
 
 deps = {
+    "numpy": "numpy",
     "skia-python": "skia",
     "pillow": "PIL",
 }
