@@ -85,7 +85,7 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
                 "output": ("ShaderNodeOutputMaterial", {"location": (240, 0)},
                     {"Surface": ("shader", 0)}),
             }
-            CustomNodetreeNodeBase.setup_nodes(material.node_tree, nodes_def)
+            CustomNodetreeNodeBase.setup_nodes(material.node_tree, nodes_def, False)
         mesh.materials.append(material)
 
         bpy.ops.object.select_all(action="DESELECT")
