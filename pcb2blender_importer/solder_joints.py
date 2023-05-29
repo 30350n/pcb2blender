@@ -4,7 +4,7 @@ from bpy.props import *
 import numpy as np
 
 from .importer import MM_TO_M
-from .custom_node_utils import setup_node_tree
+from .custom_node_utils import CustomNodetreeNodeBase
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
     """Add a solder joint"""
@@ -80,12 +80,12 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
             material = bpy.data.materials.new(name)
             material.use_nodes = True
             material.node_tree.nodes.clear()
-            nodes = {
+            nodes_def = {
                 "shader": ("ShaderNodeBsdfSolder", {}, {}),
                 "output": ("ShaderNodeOutputMaterial", {"location": (240, 0)},
                     {"Surface": ("shader", 0)}),
             }
-            setup_node_tree(material.node_tree, nodes)
+            CustomNodetreeNodeBase.setup_nodes(material.node_tree, nodes_def)
         mesh.materials.append(material)
 
         bpy.ops.object.select_all(action="DESELECT")

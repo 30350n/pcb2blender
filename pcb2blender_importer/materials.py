@@ -93,7 +93,7 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
         color = srgb2lin(SILKS_COLOR_MAP.get(silkscreen, stackup.silks_color_custom))
         silkscreen_inputs = {"Color": [*color, 1.0], "Roughness": 0.25}
 
-    nodes = {
+    nodes_def = {
         "cu":    ("ShaderNodeTexImage", {"location": (-500, -320), "hide": True,
             "interpolation": "Cubic", "image": images["Cu"]}, {}),
         "mask":  ("ShaderNodeTexImage", {"location": (-500, -360), "hide": True,
@@ -141,7 +141,7 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
             {"Surface": ("shader", "Shader"), "Displacement": ("shader", "Displacement")}),
     }
 
-    setup_node_tree(node_tree, nodes, label_nodes=False)
+    CustomNodetreeNodeBase.setup_nodes(node_tree, nodes_def, label_nodes=False)
 
 class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Surface Finish BSDF"
@@ -178,46 +178,46 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
         ("CUSTOM", "Custom", ""),
     ))
 
+    inputs_def = {
+        "Color": ("NodeSocketColor", {}),
+        "Roughness": ("NodeSocketFloat",  {}),
+        "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
+        "Normal": ("NodeSocketVector", {"hide_value": True}),
+    }
+
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
+            "Scale": 500.0, "Detail": 4.0, "Roughness": 0.4, "Distortion": 0.1}),
+        "noise_bipolar": ("ShaderNodeMapRange", {},
+            {"Value": ("noise", "Fac"), "To Min": -0.5, "To Max": 0.5}),
+        "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("noise_bipolar", 0), 1: ("inputs", "Texture Strength")}),
+        "bump": ("ShaderNodeBump", {}, {"Strength": 0.1, "Distance": 1e-3,
+            "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
+        "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
+
+        "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("inputs", "Texture Strength"), 1: 0.5}),
+        "scratches": ("ShaderNodeMat4cadScratches", {}, {
+            "Color": ("inputs", "Color"), "Roughness": ("roughness", 0),
+            "Normal": ("bump", 0), "Strength": ("scratches_strength", 0),
+            "Vector": ("tex_coord", "Object"), "Scale": 3.0}),
+
+        "bevel": ("ShaderNodeBevel", {},
+            {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
+        "shader": ("ShaderNodeBsdfPrincipled", {}, {
+            "Base Color": ("scratches", "Color"), "Metallic": 1.0,
+            "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
+    }
+
+    outputs_def = {
+        "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
+    }
+
     def init(self, context):
-        inputs = {
-            "Color": ("NodeSocketColor", {}),
-            "Roughness": ("NodeSocketFloat",  {}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
-            "Normal": ("NodeSocketVector", {"hide_value": True}),
-        }
-
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
-                "Scale": 500.0, "Detail": 4.0, "Roughness": 0.4, "Distortion": 0.1}),
-            "noise_bipolar": ("ShaderNodeMapRange", {},
-                {"Value": ("noise", "Fac"), "To Min": -0.5, "To Max": 0.5}),
-            "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("noise_bipolar", 0), 1: ("inputs", "Texture Strength")}),
-            "bump": ("ShaderNodeBump", {}, {"Strength": 0.1, "Distance": 1e-3,
-                "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
-            "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
-
-            "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Texture Strength"), 1: 0.5}),
-            "scratches": ("ShaderNodeMat4cadScratches", {}, {
-                "Color": ("inputs", "Color"), "Roughness": ("roughness", 0),
-                "Normal": ("bump", 0), "Strength": ("scratches_strength", 0),
-                "Vector": ("tex_coord", "Object"), "Scale": 3.0}),
-
-            "bevel": ("ShaderNodeBevel", {},
-                {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
-            "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("scratches", "Color"), "Metallic": 1.0,
-                "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
-        }
-
-        outputs = {
-            "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+        super().init(context)
         self.update_props(context)
 
 class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
@@ -275,93 +275,93 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ("CUSTOM", "Custom", ""),
     ))
 
+    inputs_def = {
+        "Light Color": ("NodeSocketColor",  {}),
+        "Dark Color":  ("NodeSocketColor",  {}),
+        "Roughness":   ("NodeSocketFloat",  {"default_value": 0.25}),
+        "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
+        "Normal": ("NodeSocketVector", {"hide_value": True}),
+        "F_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
+        "B_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
+    }
+
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "separate_position": ("ShaderNodeSeparateXYZ", {},
+            {"Vector": ("tex_coord", "Object")}),
+        "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
+            {0: ("separate_position", "Z"), 1: 0.0}),
+
+        "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+            "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
+        "cu_invert": ("ShaderNodeInvert", {}, {"Color": ("cu", 0)}),
+
+        "mix_color": ("ShaderNodeMixRGB", {}, {"Fac": ("cu", 0),
+            1: ("inputs", "Dark Color"), 2: ("inputs", "Light Color")}),
+        "subsurface": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("cu_invert", 0), 1: 0.001}),
+        "ssr": ("ShaderNodeBrightContrast", {},
+            {"Color": ("mix_color", 0), "Bright": 0.1}),
+
+        "strength_noise": ("ShaderNodeTexNoise", {},
+            {"Vector": ("tex_coord", "Object"), "Scale": 100.0, "Detail": 0.0}),
+        "strength_scaled": ("ShaderNodeMapRange", {},
+            {"Value": ("strength_noise", "Fac"), "To Min": -0.012, "To Max": 0.044}),
+        "strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("strength_scaled", 0), 1: ("inputs", "Texture Strength")}),
+        "scale": ("ShaderNodeVectorMath", {"operation": "MULTIPLY"},
+            {0: ("tex_coord", "Object"), 1: Vector((3000.0, 3000.0, 3000.0))}),
+        "checkers": ("ShaderNodeTexVoronoi", {"distance": "MINKOWSKI"},
+            {"Vector": ("scale", 0), "Scale": 1.0, "Exponent": 1.8, "Randomness": 0.1}),
+        "scale2": ("ShaderNodeVectorMath", {"operation": "MULTIPLY"},
+            {0: ("scale", 0), 1: Vector((1.0, 0.0, 0.25))}),
+        "lines": ("ShaderNodeTexVoronoi", {"distance": "MINKOWSKI"},
+            {"Vector": ("scale2", 0), "Scale": 1.0, "Exponent": 1.8, "Randomness": 0.1}),
+        "combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("checkers", "Distance"), 1: 0.25, 2: ("lines", "Distance")}),
+        "height_scale": ("ShaderNodeMapRange", {}, {"Value": ("cu", 0), "To Min": 0.25}),
+        "height": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("combined", 0), 1: ("height_scale", 0)}),
+        "bump": ("ShaderNodeBump", {}, {"Normal": ("inputs", "Normal"),
+            "Strength": ("strength", 0), "Distance": 1e-3, "Height": ("height", 0)}),
+
+        "roughness_cu": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("inputs", "Roughness"), 1: 0.5}),
+        "roughness": ("ShaderNodeMapRange", {}, {"Value": ("cu", 0),
+            "From Min": 1.0, "From Max": 0.0,
+            "To Min": ("roughness_cu", 0), "To Max": ("inputs", "Roughness")}),
+
+        "noise_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("inputs", "Texture Strength"), 1: 0.65}),
+        "noise_scale": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("cu", 0), 1: 150.0, 2: 0.5}),
+        "noise": ("ShaderNodeMat4cadNoise", {}, {
+            "Roughness": ("roughness", 0), "Normal": ("bump", 0),
+            "Strength": ("noise_strength", 0), "Vector": ("tex_coord", "Object"),
+            "Scale": ("noise_scale", 0)}),
+        "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("inputs", "Texture Strength"), 1: 0.3}),
+        "scratches": ("ShaderNodeMat4cadScratches", {}, {
+            "Color": ("mix_color", 0), "Roughness": ("noise", "Roughness"),
+            "Normal": ("noise", "Normal"), "Strength": ("scratches_strength", 0),
+            "Vector": ("tex_coord", "Object"), "Scale": 2.5}),
+
+        "bevel": ("ShaderNodeBevel", {},
+            {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
+        "shader": ("ShaderNodeBsdfPrincipled", {}, {
+            "Base Color": ("scratches", "Color"),
+            "Subsurface Color": ("scratches", "Color"), "Metallic": 0.6,
+            "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
+            "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
+    }
+
+    outputs_def = {
+        "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
+        "Color": ("NodeSocketColor",  {}, ("mix_color", 0)),
+    }
+
     def init(self, context):
-        inputs = {
-            "Light Color": ("NodeSocketColor",  {}),
-            "Dark Color":  ("NodeSocketColor",  {}),
-            "Roughness":   ("NodeSocketFloat",  {"default_value": 0.25}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
-            "Normal": ("NodeSocketVector", {"hide_value": True}),
-            "F_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
-            "B_Cu":   ("NodeSocketFloat",  {"hide_value": True}),
-        }
-
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector": ("tex_coord", "Object")}),
-            "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
-                {0: ("separate_position", "Z"), 1: 0.0}),
-
-            "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
-                "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
-            "cu_invert": ("ShaderNodeInvert", {}, {"Color": ("cu", 0)}),
-
-            "mix_color": ("ShaderNodeMixRGB", {}, {"Fac": ("cu", 0),
-                1: ("inputs", "Dark Color"), 2: ("inputs", "Light Color")}),
-            "subsurface": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("cu_invert", 0), 1: 0.001}),
-            "ssr": ("ShaderNodeBrightContrast", {},
-                {"Color": ("mix_color", 0), "Bright": 0.1}),
-
-            "strength_noise": ("ShaderNodeTexNoise", {},
-                {"Vector": ("tex_coord", "Object"), "Scale": 100.0, "Detail": 0.0}),
-            "strength_scaled": ("ShaderNodeMapRange", {},
-                {"Value": ("strength_noise", "Fac"), "To Min": -0.012, "To Max": 0.044}),
-            "strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("strength_scaled", 0), 1: ("inputs", "Texture Strength")}),
-            "scale": ("ShaderNodeVectorMath", {"operation": "MULTIPLY"},
-                {0: ("tex_coord", "Object"), 1: Vector((3000.0, 3000.0, 3000.0))}),
-            "checkers": ("ShaderNodeTexVoronoi", {"distance": "MINKOWSKI"},
-                {"Vector": ("scale", 0), "Scale": 1.0, "Exponent": 1.8, "Randomness": 0.1}),
-            "scale2": ("ShaderNodeVectorMath", {"operation": "MULTIPLY"},
-                {0: ("scale", 0), 1: Vector((1.0, 0.0, 0.25))}),
-            "lines": ("ShaderNodeTexVoronoi", {"distance": "MINKOWSKI"},
-                {"Vector": ("scale2", 0), "Scale": 1.0, "Exponent": 1.8, "Randomness": 0.1}),
-            "combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("checkers", "Distance"), 1: 0.25, 2: ("lines", "Distance")}),
-            "height_scale": ("ShaderNodeMapRange", {}, {"Value": ("cu", 0), "To Min": 0.25}),
-            "height": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("combined", 0), 1: ("height_scale", 0)}),
-            "bump": ("ShaderNodeBump", {}, {"Normal": ("inputs", "Normal"),
-                "Strength": ("strength", 0), "Distance": 1e-3, "Height": ("height", 0)}),
-
-            "roughness_cu": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Roughness"), 1: 0.5}),
-            "roughness": ("ShaderNodeMapRange", {}, {"Value": ("cu", 0),
-                "From Min": 1.0, "From Max": 0.0,
-                "To Min": ("roughness_cu", 0), "To Max": ("inputs", "Roughness")}),
-
-            "noise_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Texture Strength"), 1: 0.65}),
-            "noise_scale": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("cu", 0), 1: 150.0, 2: 0.5}),
-            "noise": ("ShaderNodeMat4cadNoise", {}, {
-                "Roughness": ("roughness", 0), "Normal": ("bump", 0),
-                "Strength": ("noise_strength", 0), "Vector": ("tex_coord", "Object"),
-                "Scale": ("noise_scale", 0)}),
-            "scratches_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Texture Strength"), 1: 0.3}),
-            "scratches": ("ShaderNodeMat4cadScratches", {}, {
-                "Color": ("mix_color", 0), "Roughness": ("noise", "Roughness"),
-                "Normal": ("noise", "Normal"), "Strength": ("scratches_strength", 0),
-                "Vector": ("tex_coord", "Object"), "Scale": 2.5}),
-
-            "bevel": ("ShaderNodeBevel", {},
-                {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
-            "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("scratches", "Color"),
-                "Subsurface Color": ("scratches", "Color"), "Metallic": 0.6,
-                "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
-                "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
-        }
-
-        outputs = {
-            "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
-            "Color": ("NodeSocketColor",  {}, ("mix_color", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+        super().init(context)
         self.update_props(context)
 
 SILKS_COLOR_MAP = {
@@ -399,229 +399,223 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ("CUSTOM", "Custom", ""),
     ))
 
+    inputs_def = {
+        "Color": ("NodeSocketColor", {}),
+        "Roughness": ("NodeSocketFloat",  {}),
+        "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
+        "Normal": ("NodeSocketVector", {"hide_value": True}),
+    }
+
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
+            "Scale": 4000.0, "Detail": 0.0, "Distortion": 0.1}),
+        "bump_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("inputs", "Texture Strength"), 1: 0.025}),
+        "bump": ("ShaderNodeBump", {}, {
+            "Strength": ("bump_strength", 0), "Distance": 1e-3,
+            "Height": ("noise", 0), "Normal": ("inputs", "Normal")}),
+
+        "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", 0)}),
+        "shader": ("ShaderNodeBsdfPrincipled", {}, {
+            "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
+            "Clearcoat": 0.75, "Normal": ("bevel", 0)}),
+    }
+
+    outputs_def = {
+        "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
+    }
+
     def init(self, context):
-        inputs = {
-            "Color": ("NodeSocketColor", {}),
-            "Roughness": ("NodeSocketFloat",  {}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
-            "Normal": ("NodeSocketVector", {"hide_value": True}),
-        }
-
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
-                "Scale": 4000.0, "Detail": 0.0, "Distortion": 0.1}),
-            "bump_strength": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("inputs", "Texture Strength"), 1: 0.025}),
-            "bump": ("ShaderNodeBump", {}, {
-                "Strength": ("bump_strength", 0), "Distance": 1e-3,
-                "Height": ("noise", 0), "Normal": ("inputs", "Normal")}),
-
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", 0)}),
-            "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
-                "Clearcoat": 0.75, "Normal": ("bevel", 0)}),
-        }
-
-        outputs = {
-            "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+        super().init(context)
         self.update_props(context)
 
 class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Board Edge BSDF"
     bl_width_default = 180
 
-    def init(self, context):
-        inputs = {
-            "Base Color": ("NodeSocketColor",
-                {"default_value": (*srgb2lin(PCB_YELLOW), 1.0)}),
-            "Mask Color": ("NodeSocketColor",
-                {"default_value": (*srgb2lin(hex2rgb("28a125")), 1.0)}),
-            "Mix": ("NodeSocketFloat", {"default_value": 0.95}),
-            "Roughness": ("NodeSocketFloat",  {"default_value": 0.6}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 0.5}),
-            "Normal": ("NodeSocketVector", {"hide_value": True}),
-        }
+    inputs_def = {
+        "Base Color": ("NodeSocketColor",
+            {"default_value": (*srgb2lin(PCB_YELLOW), 1.0)}),
+        "Mask Color": ("NodeSocketColor",
+            {"default_value": (*srgb2lin(hex2rgb("28a125")), 1.0)}),
+        "Mix": ("NodeSocketFloat", {"default_value": 0.95}),
+        "Roughness": ("NodeSocketFloat",  {"default_value": 0.6}),
+        "Texture Strength": ("NodeSocketFloat", {"default_value": 0.5}),
+        "Normal": ("NodeSocketVector", {"hide_value": True}),
+    }
 
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "noise": ("ShaderNodeTexVoronoi", {"feature": "SMOOTH_F1"},
-                {"Vector": ("tex_coord", "Object"), "Scale": 15000.0}),
-            "noise_mapped": ("ShaderNodeMapRange", {}, {"Value": ("noise", "Distance"),
-                "From Max": 0.5, "To Min": 0.75, "To Max": -0.25}),
-            "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("noise_mapped", 0), 1: ("inputs", "Texture Strength")}),
-            "bump": ("ShaderNodeBump", {}, {"Strength": 0.5, "Distance": 1e-3,
-                "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
-            "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "noise": ("ShaderNodeTexVoronoi", {"feature": "SMOOTH_F1"},
+            {"Vector": ("tex_coord", "Object"), "Scale": 15000.0}),
+        "noise_mapped": ("ShaderNodeMapRange", {}, {"Value": ("noise", "Distance"),
+            "From Max": 0.5, "To Min": 0.75, "To Max": -0.25}),
+        "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("noise_mapped", 0), 1: ("inputs", "Texture Strength")}),
+        "bump": ("ShaderNodeBump", {}, {"Strength": 0.5, "Distance": 1e-3,
+            "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
+        "roughness": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("noise_scaled", 0), 1: 0.2, 2: ("inputs", "Roughness")}),
 
-            "base_color": ("ShaderNodeMixRGB", {}, {"Fac": ("inputs", "Mix"),
-                "Color1": ("inputs", "Base Color"), "Color2": ("inputs", "Mask Color")}),
-            "bump_color": ("ShaderNodeHueSaturation", {},
-                {"Saturation": 1.1, "Value": 1.5, "Color": ("inputs", "Base Color")}),
-            "color": ("ShaderNodeMixRGB", {}, {"Fac": ("noise_scaled", 0),
-                "Color1": ("base_color", 0), "Color2": ("bump_color", 0)}),
-            "ssr": ("ShaderNodeBrightContrast", {},
-                {"Color": ("color", 0), "Bright": 0.1}),
+        "base_color": ("ShaderNodeMixRGB", {}, {"Fac": ("inputs", "Mix"),
+            "Color1": ("inputs", "Base Color"), "Color2": ("inputs", "Mask Color")}),
+        "bump_color": ("ShaderNodeHueSaturation", {},
+            {"Saturation": 1.1, "Value": 1.5, "Color": ("inputs", "Base Color")}),
+        "color": ("ShaderNodeMixRGB", {}, {"Fac": ("noise_scaled", 0),
+            "Color1": ("base_color", 0), "Color2": ("bump_color", 0)}),
+        "ssr": ("ShaderNodeBrightContrast", {},
+            {"Color": ("color", 0), "Bright": 0.1}),
 
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
-            "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
-                "Subsurface": 0.001, "Subsurface Radius": ("ssr", 0),
-                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
-        }
+        "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
+        "shader": ("ShaderNodeBsdfPrincipled", {}, {
+            "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
+            "Subsurface": 0.001, "Subsurface Radius": ("ssr", 0),
+            "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
+    }
 
-        outputs = {
-            "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+    outputs_def = {
+        "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
+    }
 
 class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder BSDF"
     bl_width_default = 180
 
-    def init(self, context):
-        inputs = {
-            "Color": ("NodeSocketColor",
-                {"default_value": (*srgb2lin(hex2rgb("aaaaa6")), 1.0)}),
-            "Roughness": ("NodeSocketFloat",  {"default_value": 0.25}),
-            "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
-            "Normal": ("NodeSocketVector", {"hide_value": True}),
-        }
+    inputs_def = {
+        "Color": ("NodeSocketColor",
+            {"default_value": (*srgb2lin(hex2rgb("aaaaa6")), 1.0)}),
+        "Roughness": ("NodeSocketFloat",  {"default_value": 0.25}),
+        "Texture Strength": ("NodeSocketFloat", {"default_value": 1.0}),
+        "Normal": ("NodeSocketVector", {"hide_value": True}),
+    }
 
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "noise_coarse": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Generated"),
-                "Scale": 10.0, "Detail": 5.0, "Distortion": 0.1}),
-            "noise_fine": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Generated"),
-                "Scale": 100.0, "Detail": 5.0, "Roughness": 0.75, "Distortion": 0.5}),
-            "noise_combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("noise_fine", "Fac"), 1: -0.2, 2: ("noise_coarse", "Fac")}),
-            "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("noise_combined", 0), 1: ("inputs", "Texture Strength")}),
-            "bump": ("ShaderNodeBump", {}, {"Strength": 0.05, "Distance": 1e-3,
-                "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
-            "roughness": ("ShaderNodeMapRange", {}, {
-                "Value": ("noise_scaled", 0), "To Min": ("inputs", "Roughness"),
-                "From Min": 0.4, "From Max": 0.8, "To Max": 0.05}),
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "noise_coarse": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Generated"),
+            "Scale": 10.0, "Detail": 5.0, "Distortion": 0.1}),
+        "noise_fine": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Generated"),
+            "Scale": 100.0, "Detail": 5.0, "Roughness": 0.75, "Distortion": 0.5}),
+        "noise_combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("noise_fine", "Fac"), 1: -0.2, 2: ("noise_coarse", "Fac")}),
+        "noise_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("noise_combined", 0), 1: ("inputs", "Texture Strength")}),
+        "bump": ("ShaderNodeBump", {}, {"Strength": 0.05, "Distance": 1e-3,
+            "Height": ("noise_scaled", 0), "Normal": ("inputs", "Normal")}),
+        "roughness": ("ShaderNodeMapRange", {}, {
+            "Value": ("noise_scaled", 0), "To Min": ("inputs", "Roughness"),
+            "From Min": 0.4, "From Max": 0.8, "To Max": 0.05}),
 
-            "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
-            "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("inputs", "Color"), "Metallic": 1.0,
-                "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
-        }
+        "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
+        "shader": ("ShaderNodeBsdfPrincipled", {}, {
+            "Base Color": ("inputs", "Color"), "Metallic": 1.0,
+            "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
+    }
 
-        outputs = {
-            "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+    outputs_def = {
+        "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
+    }
 
 class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "PCB Shader"
     bl_width_default = 180
 
+    inputs_def = {
+        "Silkscreen Quality": ("NodeSocketFloat", {"default_value": 0.8}),
+        "Base Material":  ("NodeSocketShader", {}),
+        "Exposed Copper": ("NodeSocketShader", {}),
+        "Solder Mask":    ("NodeSocketShader", {}),
+        "Silkscreen":     ("NodeSocketShader", {}),
+        "Solder":         ("NodeSocketShader", {}),
+        "Board Edge":     ("NodeSocketShader", {}),
+        "F_Cu":    ("NodeSocketFloat", {"hide_value": True}),
+        "B_Cu":    ("NodeSocketFloat", {"hide_value": True}),
+        "F_Mask":  ("NodeSocketFloat", {"hide_value": True}),
+        "B_Mask":  ("NodeSocketFloat", {"hide_value": True}),
+        "F_SilkS": ("NodeSocketFloat", {"hide_value": True}),
+        "B_SilkS": ("NodeSocketFloat", {"hide_value": True}),
+        "F_Paste": ("NodeSocketFloat", {"hide_value": True}),
+        "B_Paste": ("NodeSocketFloat", {"hide_value": True}),
+    }
+
+    nodes_def = {
+        "tex_coord": ("ShaderNodeTexCoord", {}, {}),
+        "separate_position": ("ShaderNodeSeparateXYZ", {},
+            {"Vector": ("tex_coord", "Object")}),
+        "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
+            {0: ("separate_position", "Z"), 1: 0.0}),
+
+        "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+            "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
+        "mask": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+            "Color1": ("inputs", "F_Mask"), "Color2": ("inputs", "B_Mask")}),
+        "silks": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+            "Color1": ("inputs", "F_SilkS"), "Color2": ("inputs", "B_SilkS")}),
+        "paste": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
+            "Color1": ("inputs", "F_Paste"), "Color2": ("inputs", "B_Paste")}),
+
+        "cu_exposed": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
+            {0: ("cu", 0), 1: ("mask", 0)}),
+        "silks_cut": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
+            {0: ("silks", 0), 1: ("cu_exposed", 0)}),
+        "edge_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_BOARD_EDGE}, {}),
+        "hole_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_THROUGH_HOLES}, {}),
+        "combined_vc": ("ShaderNodeMath", {"operation": "ADD", "use_clamp": True},
+            {0: ("edge_vc", "Fac"), 1: ("hole_vc", "Fac")}),
+        "silks_cut2": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
+            {0: ("silks_cut", 0), 1: ("combined_vc", 0)}),
+
+        "silks_noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
+            "Scale": 5000, "Detail": 0.5, "Roughness": 0.1, "Distortion": 0.1}),
+        "silks_quality": ("ShaderNodeMapRange", {"clamp": False}, {
+            "Value": ("inputs", "Silkscreen Quality"), "To Min": -0.65, "To Max": -0.95}),
+        "silks_combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("silks_cut2", 0), 1: ("silks_quality", 0), 2: ("silks_noise", "Fac")}),
+        "silks_damaged": ("ShaderNodeMath", {"operation": "MULTIPLY", "use_clamp": True},
+            {0: ("silks_combined", 0), 1: -15.0}),
+
+        "cu_invert": ("ShaderNodeInvert", {}, {"Color": ("cu", 0)}),
+        "plated_edge": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("edge_vc", "Fac"), 1: ("cu_invert", 0)}),
+        "z_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("separate_position", "Z"), 1: 1000.0}),
+        "z_abs": ("ShaderNodeMath", {"operation": "ABSOLUTE"}, {0: ("z_scaled", 0)}),
+        "mask_blend": ("ShaderNodeValToRGB", {}, {0: ("z_abs", 0)}),
+        "board_edge": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("plated_edge", 0), 1: ("mask_blend", 0)}),
+
+        "mix_cu": ("ShaderNodeMixShader", {}, {"Fac": ("cu", 0),
+            1: ("inputs", "Base Material"), 2: ("inputs", "Exposed Copper")}),
+        "mix_mask": ("ShaderNodeMixShader", {}, {"Fac": ("mask", 0),
+            1: ("mix_cu", 0), 2: ("inputs", "Solder Mask")}),
+        "mix_silks": ("ShaderNodeMixShader", {}, {"Fac": ("silks_damaged", 0),
+            1: ("mix_mask", 0), 2: ("inputs", "Silkscreen")}),
+        "mix_solder": ("ShaderNodeMixShader", {}, {"Fac": ("paste", 0),
+            1: ("mix_silks", 0), 2: ("inputs", "Solder")}),
+        "mix_board_edge": ("ShaderNodeMixShader", {}, {"Fac": ("board_edge", 0),
+            1: ("mix_solder", 0), 2: ("inputs", "Board Edge")}),
+
+        "multiply_mask": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("mask", 0), 1: 0.02}),
+        "multiply_cu": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
+            {0: ("cu", 0), 1: 0.03, 2: ("multiply_mask", 0)}),
+        "multiply_silks": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("silks_damaged", 0), 1: 0.0495}),
+        "max_silks": ("ShaderNodeMath", {"operation": "MAXIMUM"},
+            {0: ("multiply_cu", 0), 1: ("multiply_silks", 0)}),
+        "multiply_scale": ("ShaderNodeMath", {"operation": "MULTIPLY"},
+            {0: ("max_silks", 0), 1: 5e-3}),
+        "displacement": ("ShaderNodeDisplacement", {},
+            {"Height": ("multiply_scale", 0)}),
+    }
+
+    outputs_def = {
+        "Shader": ("NodeSocketShader", {}, ("mix_board_edge", 0)),
+        "Displacement": ("NodeSocketVector", {}, ("displacement", 0)),
+    }
+
     def init(self, context):
-        inputs = {
-            "Silkscreen Quality": ("NodeSocketFloat", {"default_value": 0.8}),
-            "Base Material":  ("NodeSocketShader", {}),
-            "Exposed Copper": ("NodeSocketShader", {}),
-            "Solder Mask":    ("NodeSocketShader", {}),
-            "Silkscreen":     ("NodeSocketShader", {}),
-            "Solder":         ("NodeSocketShader", {}),
-            "Board Edge":     ("NodeSocketShader", {}),
-            "F_Cu":    ("NodeSocketFloat", {"hide_value": True}),
-            "B_Cu":    ("NodeSocketFloat", {"hide_value": True}),
-            "F_Mask":  ("NodeSocketFloat", {"hide_value": True}),
-            "B_Mask":  ("NodeSocketFloat", {"hide_value": True}),
-            "F_SilkS": ("NodeSocketFloat", {"hide_value": True}),
-            "B_SilkS": ("NodeSocketFloat", {"hide_value": True}),
-            "F_Paste": ("NodeSocketFloat", {"hide_value": True}),
-            "B_Paste": ("NodeSocketFloat", {"hide_value": True}),
-        }
-
-        nodes = {
-            "tex_coord": ("ShaderNodeTexCoord", {}, {}),
-            "separate_position": ("ShaderNodeSeparateXYZ", {},
-                {"Vector": ("tex_coord", "Object")}),
-            "is_bottom_layer": ("ShaderNodeMath", {"operation": "LESS_THAN"},
-                {0: ("separate_position", "Z"), 1: 0.0}),
-
-            "cu": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
-                "Color1": ("inputs", "F_Cu"), "Color2": ("inputs", "B_Cu")}),
-            "mask": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
-                "Color1": ("inputs", "F_Mask"), "Color2": ("inputs", "B_Mask")}),
-            "silks": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
-                "Color1": ("inputs", "F_SilkS"), "Color2": ("inputs", "B_SilkS")}),
-            "paste": ("ShaderNodeMixRGB", {}, {"Fac": ("is_bottom_layer", 0),
-                "Color1": ("inputs", "F_Paste"), "Color2": ("inputs", "B_Paste")}),
-
-            "cu_exposed": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
-                {0: ("cu", 0), 1: ("mask", 0)}),
-            "silks_cut": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
-                {0: ("silks", 0), 1: ("cu_exposed", 0)}),
-            "edge_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_BOARD_EDGE}, {}),
-            "hole_vc": ("ShaderNodeAttribute", {"attribute_name": LAYER_THROUGH_HOLES}, {}),
-            "combined_vc": ("ShaderNodeMath", {"operation": "ADD", "use_clamp": True},
-                {0: ("edge_vc", "Fac"), 1: ("hole_vc", "Fac")}),
-            "silks_cut2": ("ShaderNodeMath", {"operation": "SUBTRACT", "use_clamp": True},
-                {0: ("silks_cut", 0), 1: ("combined_vc", 0)}),
-
-            "silks_noise": ("ShaderNodeTexNoise", {}, {"Vector": ("tex_coord", "Object"),
-                "Scale": 5000, "Detail": 0.5, "Roughness": 0.1, "Distortion": 0.1}),
-            "silks_quality": ("ShaderNodeMapRange", {"clamp": False}, {
-                "Value": ("inputs", "Silkscreen Quality"), "To Min": -0.65, "To Max": -0.95}),
-            "silks_combined": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("silks_cut2", 0), 1: ("silks_quality", 0), 2: ("silks_noise", "Fac")}),
-            "silks_damaged": ("ShaderNodeMath", {"operation": "MULTIPLY", "use_clamp": True},
-                {0: ("silks_combined", 0), 1: -15.0}),
-
-            "cu_invert": ("ShaderNodeInvert", {}, {"Color": ("cu", 0)}),
-            "plated_edge": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("edge_vc", "Fac"), 1: ("cu_invert", 0)}),
-            "z_scaled": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("separate_position", "Z"), 1: 1000.0}),
-            "z_abs": ("ShaderNodeMath", {"operation": "ABSOLUTE"}, {0: ("z_scaled", 0)}),
-            "mask_blend": ("ShaderNodeValToRGB", {}, {0: ("z_abs", 0)}),
-            "board_edge": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("plated_edge", 0), 1: ("mask_blend", 0)}),
-
-            "mix_cu": ("ShaderNodeMixShader", {}, {"Fac": ("cu", 0),
-                1: ("inputs", "Base Material"), 2: ("inputs", "Exposed Copper")}),
-            "mix_mask": ("ShaderNodeMixShader", {}, {"Fac": ("mask", 0),
-                1: ("mix_cu", 0), 2: ("inputs", "Solder Mask")}),
-            "mix_silks": ("ShaderNodeMixShader", {}, {"Fac": ("silks_damaged", 0),
-                1: ("mix_mask", 0), 2: ("inputs", "Silkscreen")}),
-            "mix_solder": ("ShaderNodeMixShader", {}, {"Fac": ("paste", 0),
-                1: ("mix_silks", 0), 2: ("inputs", "Solder")}),
-            "mix_board_edge": ("ShaderNodeMixShader", {}, {"Fac": ("board_edge", 0),
-                1: ("mix_solder", 0), 2: ("inputs", "Board Edge")}),
-
-            "multiply_mask": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("mask", 0), 1: 0.02}),
-            "multiply_cu": ("ShaderNodeMath", {"operation": "MULTIPLY_ADD"},
-                {0: ("cu", 0), 1: 0.03, 2: ("multiply_mask", 0)}),
-            "multiply_silks": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("silks_damaged", 0), 1: 0.0495}),
-            "max_silks": ("ShaderNodeMath", {"operation": "MAXIMUM"},
-                {0: ("multiply_cu", 0), 1: ("multiply_silks", 0)}),
-            "multiply_scale": ("ShaderNodeMath", {"operation": "MULTIPLY"},
-                {0: ("max_silks", 0), 1: 5e-3}),
-            "displacement": ("ShaderNodeDisplacement", {},
-                {"Height": ("multiply_scale", 0)}),
-        }
-
-        outputs = {
-            "Shader": ("NodeSocketShader", {}, ("mix_board_edge", 0)),
-            "Displacement": ("NodeSocketVector", {}, ("displacement", 0)),
-        }
-
-        self.init_node_tree(inputs, nodes, outputs)
+        super().init(context)
 
         color_ramp = self.node_tree.nodes["mask_blend"].color_ramp
         color_ramp.interpolation = "B_SPLINE"
