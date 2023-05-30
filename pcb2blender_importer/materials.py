@@ -216,9 +216,9 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
         "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
     }
 
-    def init(self, context):
-        super().init(context)
-        self.update_props(context)
+    def update_custom_node(self):
+        self.update_props(None)
+        super().update_custom_node()
 
 MASK_COLOR_MAP = {
     "GREEN":       (hex2rgb("28a125"), hex2rgb("155211")),
@@ -345,9 +345,9 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         "Color": ("NodeSocketColor",  {}, ("mix_color", 0)),
     }
 
-    def init(self, context):
-        super().init(context)
-        self.update_props(context)
+    def update_custom_node(self):
+        self.update_props(None)
+        super().update_custom_node()
 
 SILKS_COLOR_MAP = {
     "GREEN":  hex2rgb("28a125"),
@@ -411,9 +411,9 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         "BSDF":  ("NodeSocketShader", {}, ("shader", 0)),
     }
 
-    def init(self, context):
-        super().init(context)
-        self.update_props(context)
+    def update_custom_node(self):
+        self.update_props(None)
+        super().update_custom_node()
 
 class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Board Edge BSDF"
