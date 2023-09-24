@@ -729,14 +729,26 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         bm = bmesh.new()
         bm.from_mesh(obj.data)
 
+        # TODO: these layers should be created with numpy, not bmesh
+
         board_edge = bm.faces.layers.int.new(LAYER_BOARD_EDGE)
         through_holes = bm.faces.layers.int.new(LAYER_THROUGH_HOLES)
 
         board_edge_verts = set()
         for face in bm.faces:
-            if abs(face.normal.z) < 1e-3 and face.calc_area() > 1e-10:
-                face[board_edge] = 1
-                board_edge_verts = board_edge_verts.union(face.verts)
+            if face.calc_area() > 1e-10:
+                if abs(face.normal.z) > 1e-3:
+                    continue
+            else:
+                lastsign = np.sign(face.verts[0].co.z)
+                for vert in face.verts[1:]:
+                    if lastsign != (lastsign := np.sign(vert.co.z)):
+                        break
+                else:
+                    continue
+
+            face[board_edge] = 1
+            board_edge_verts = board_edge_verts.union(face.verts)
 
         midpoint = len(bm.verts) // 2
         bm.verts.ensure_lookup_table()
