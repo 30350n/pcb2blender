@@ -19,17 +19,17 @@ def generate_release():
     if Repo().is_dirty():
         error("repo is dirty (stash changes before generating a release)")
 
-    with patch.object(sys, "argv", ["", "-q"]):
-        info("running pytest ...")
-        if (exit_code := pytest()) != 0:
-            error(f"tests failed with {exit_code}")
-
     if Repo().head.is_detached:
         error("repo is in detached head state")
     if "up to date" not in Repo().git.status():
         error("current commit is not pushed")
     if Repo().tags[-1].commit != Repo().commit():
         error("current commit is not tagged")
+
+    with patch.object(sys, "argv", ["", "-q"]):
+        info("running pytest ...")
+        if (exit_code := pytest()) != 0:
+            error(f"tests failed with {exit_code}")
 
     info(f"generating release for {Repo().tags[-1]} ... ")
 
