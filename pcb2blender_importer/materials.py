@@ -220,39 +220,30 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
 
+MASK_COLOR_MAP = {
+    "GREEN":       (hex2rgb("28a125"), hex2rgb("155211")),
+    "RED":         (hex2rgb("e50007"), hex2rgb("731114")),
+    "YELLOW":      (hex2rgb("dac92b"), hex2rgb("687c19")),
+    "BLUE":        (hex2rgb("0d5eaa"), hex2rgb("053059")),
+    "PURPLE":      (hex2rgb("6b2baa"), hex2rgb("361359")),
+    "WHITE":       (hex2rgb("d3cfc9"), hex2rgb("e1dddc")),
+    "BLACK":       (hex2rgb("10100f"), hex2rgb("000000")),
+    "MATTE_BLACK": (hex2rgb("000000"), hex2rgb("000000")),
+}
+
 class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 180
 
     def update_props(self, context):
-        roughness = 0.25
+        light_color, dark_color = MASK_COLOR_MAP[self.soldermask]
         match self.soldermask:
-            case "GREEN":
-                light_color = hex2rgb("28a125")
-                dark_color  = hex2rgb("155211")
-            case "RED":
-                light_color = hex2rgb("e50007")
-                dark_color  = hex2rgb("731114")
-            case "YELLOW":
-                light_color = hex2rgb("dac92b")
-                dark_color  = hex2rgb("687c19")
-            case "BLUE":
-                light_color = hex2rgb("0d5eaa")
-                dark_color  = hex2rgb("053059")
-            case "PURPLE":
-                light_color = hex2rgb("6b2baa")
-                dark_color  = hex2rgb("361359")
             case "WHITE":
-                light_color = hex2rgb("d3cfc9")
-                dark_color  = hex2rgb("e1dddc")
                 roughness = 0.15
-            case "BLACK":
-                light_color = hex2rgb("10100f")
-                dark_color  = hex2rgb("000000")
             case "MATTE_BLACK":
-                light_color = hex2rgb("000000")
-                dark_color  = hex2rgb("000000")
                 roughness = 1.6
+            case _:
+                roughness = 0.25
 
         if not self.soldermask == "CUSTOM":
             self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
@@ -263,17 +254,11 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         for input_name in ("Light Color", "Dark Color", "Roughness"):
             self.inputs[input_name].hide = hidden
 
-    soldermask: EnumProperty(name="Solder Mask", update=update_props, items=(
-        ("GREEN",  "Green",  ""),
-        ("RED",    "Red",    ""),
-        ("YELLOW", "Yellow", ""),
-        ("BLUE",   "Blue",   ""),
-        ("PURPLE", "Purple", ""),
-        ("WHITE",  "White",  ""),
-        ("BLACK",  "Black",  ""),
-        ("MATTE_BLACK",  "Matte Black",  ""),
-        ("CUSTOM", "Custom", ""),
-    ))
+    soldermask: EnumProperty(name="Solder Mask", update=update_props, items=tuple(zip(
+        MASK_COLOR_MAP,
+        (" ".join(w.capitalize() for w in string.split("_")) for string in MASK_COLOR_MAP),
+        ("" for _ in MASK_COLOR_MAP))),
+    )
 
     def init(self, context):
         inputs = {
