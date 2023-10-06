@@ -32,7 +32,7 @@ them, after last minute board revisions.
 - (manual) Download the `pcb2blender_exporter.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),
   unpack the `plugins` directory from it into your
-  [Kicad Plugin directory](https://dev-docs.kicad.org/en/python/pcbnew/) and rename it to
+  [KiCad Plugin directory](https://dev-docs.kicad.org/en/apis-and-binding/pcbnew/) and rename it to
   `pcb2blender_exporter`.
 
 ### Importer (Blender)
