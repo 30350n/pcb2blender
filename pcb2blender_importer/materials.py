@@ -83,7 +83,7 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
     soldermask = stackup.mask_color.name
     soldermask_inputs = {}
     if soldermask == "CUSTOM":
-        color = srgb2lin(stackup.mask_color_custom)
+        color = Color(srgb2lin(stackup.mask_color_custom))
         soldermask_inputs = {"Light Color": [*color, 1.0], "Dark Color":  [*(color * 0.2), 1.0]}
 
     silkscreen = stackup.silks_color.name
