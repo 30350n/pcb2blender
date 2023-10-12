@@ -257,11 +257,13 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         for input_name in ("Light Color", "Dark Color", "Roughness"):
             self.inputs[input_name].hide = hidden
 
-    soldermask: EnumProperty(name="Solder Mask", update=update_props, items=tuple(zip(
-        MASK_COLOR_MAP,
-        (" ".join(w.capitalize() for w in string.split("_")) for string in MASK_COLOR_MAP),
-        ("" for _ in MASK_COLOR_MAP))),
-    )
+    soldermask: EnumProperty(name="Solder Mask", update=update_props, items=(
+        *(
+            (name, " ".join(word.capitalize() for word in name.split("_")), "")
+            for name in MASK_COLOR_MAP
+        ),
+        ("CUSTOM", "Custom", ""),
+    ))
 
     def init(self, context):
         inputs = {
