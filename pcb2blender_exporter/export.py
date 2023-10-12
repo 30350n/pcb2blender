@@ -280,7 +280,14 @@ def get_temppath(filename):
 def init_tempdir():
     tempdir = get_tempdir()
     if tempdir.exists():
-        shutil.rmtree(tempdir)
+        try:
+            shutil.rmtree(tempdir)
+        except OSError:
+            # try to delete all files first
+            for file in tempdir.glob("**/*"):
+                if file.is_file():
+                    file.unlink()
+            shutil.rmtree(tempdir)
     tempdir.mkdir()
 
 def hex2rgb(hex_string):
