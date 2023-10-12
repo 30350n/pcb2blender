@@ -87,11 +87,14 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
         soldermask_inputs = {"Light Color": [*color, 1.0], "Dark Color":  [*(color * 0.2), 1.0]}
 
     silkscreen = stackup.silks_color.name
-    silkscreen_inputs = {}
-    if silkscreen in SILKS_COLOR_MAP or silkscreen == "CUSTOM":
+    silkscreen_color = stackup.silks_color_custom
+    if color := SILKS_COLOR_MAP.get(silkscreen):
         silkscreen = "CUSTOM"
-        color = srgb2lin(SILKS_COLOR_MAP.get(silkscreen, stackup.silks_color_custom))
-        silkscreen_inputs = {"Color": [*color, 1.0], "Roughness": 0.25}
+        silkscreen_color = color
+
+    silkscreen_inputs = {}
+    if silkscreen == "CUSTOM":
+        silkscreen_inputs = {"Color": [*silkscreen_color, 1.0], "Roughness": 0.25}
 
     nodes = {
         "cu":    ("ShaderNodeTexImage", {"location": (-500, -320), "hide": True,
@@ -162,7 +165,7 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
                 roughness = 0.1
                 texture_strength = 0.25
 
-        if not self.surface_finish == "CUSTOM":
+        if self.surface_finish != "CUSTOM":
             self.inputs["Color"].default_value = (*srgb2lin(color), 1.0)
             self.inputs["Roughness"].default_value = roughness
             self.inputs["Texture Strength"].default_value = texture_strength
@@ -245,7 +248,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             case _:
                 roughness = 0.25
 
-        if not self.soldermask == "CUSTOM":
+        if self.soldermask != "CUSTOM":
             self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
             self.inputs["Dark Color"].default_value  = (*srgb2lin(dark_color),  1.0)
             self.inputs["Roughness"].default_value = roughness
@@ -370,7 +373,7 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
                 color = hex2rgb("100f0f")
                 roughness = 0.2
 
-        if not self.silkscreen == "CUSTOM":
+        if self.silkscreen != "CUSTOM":
             self.inputs["Color"].default_value = (*srgb2lin(color), 1.0)
             self.inputs["Roughness"].default_value = roughness
 
