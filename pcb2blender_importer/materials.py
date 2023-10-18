@@ -233,29 +233,29 @@ MASK_COLOR_MAP = {
     "BLACK":       (hex2rgb("10100f"), hex2rgb("000000")),
     "MATTE_BLACK": (hex2rgb("000000"), hex2rgb("000000")),
 }
+DEFAULT_MASK_ROUGHNESS = 0.25
+MASK_ROUGHNESS_MAP = {
+    "WHITE": 0.15,
+    "MATTE_BLACK": 1.6,
+}
 
 class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 180
 
     def update_props(self, context):
-        light_color, dark_color = MASK_COLOR_MAP[self.soldermask]
-        match self.soldermask:
-            case "WHITE":
-                roughness = 0.15
-            case "MATTE_BLACK":
-                roughness = 1.6
-            case _:
-                roughness = 0.25
-
-        if self.soldermask != "CUSTOM":
-            self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
-            self.inputs["Dark Color"].default_value  = (*srgb2lin(dark_color),  1.0)
-            self.inputs["Roughness"].default_value = roughness
-
-        hidden = self.soldermask != "CUSTOM"
+        is_custom = self.soldermask == "CUSTOM"
         for input_name in ("Light Color", "Dark Color", "Roughness"):
-            self.inputs[input_name].hide = hidden
+            self.inputs[input_name].hide = not is_custom
+        if is_custom:
+            return
+
+        light_color, dark_color = MASK_COLOR_MAP[self.soldermask]
+        roughness = MASK_ROUGHNESS_MAP.get(self.soldermask, DEFAULT_MASK_ROUGHNESS)
+
+        self.inputs["Light Color"].default_value = (*srgb2lin(light_color), 1.0)
+        self.inputs["Dark Color"].default_value  = (*srgb2lin(dark_color),  1.0)
+        self.inputs["Roughness"].default_value = roughness
 
     soldermask: EnumProperty(name="Solder Mask", update=update_props, items=(
         *(
