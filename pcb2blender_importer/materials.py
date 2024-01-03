@@ -4,12 +4,11 @@ from .mat4cad.blender import register as register_mat4cad, unregister as unregis
 from .custom_node_utils import *
 
 import bpy
+from bl_ui import node_add_menu
 from bpy.props import EnumProperty
 from mathutils import Vector, Color
 
-from bpy.types import ShaderNodeCustomGroup, NodeTree
-from nodeitems_utils import NodeItem
-from nodeitems_builtins import ShaderNodeCategory
+from bpy.types import Menu, NodeTree, ShaderNodeCustomGroup
 
 LAYER_BOARD_EDGE = "pcb_board_edge"
 LAYER_THROUGH_HOLES = "pcb_through_holes"
@@ -340,9 +339,8 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "bevel": ("ShaderNodeBevel", {},
                 {"Radius": 1e-4, "Normal": ("scratches", "Normal")}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("scratches", "Color"),
-                "Subsurface Color": ("scratches", "Color"), "Metallic": 0.6,
-                "Subsurface": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
+                "Base Color": ("scratches", "Color"), "Metallic": 0.6,
+                "Subsurface Weight": ("subsurface", 0), "Subsurface Radius": ("ssr", 0),
                 "Roughness": ("scratches", "Roughness"), "Normal": ("bevel", 0)}),
         }
 
@@ -410,7 +408,7 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 5e-5, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
                 "Base Color": ("inputs", "Color"), "Roughness": ("inputs", "Roughness"),
-                "Clearcoat": 0.75, "Normal": ("bevel", 0)}),
+                "Coat Weight": 0.75, "Normal": ("bevel", 0)}),
         }
 
         outputs = {
@@ -460,8 +458,8 @@ class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomG
 
             "bevel": ("ShaderNodeBevel", {}, {"Radius": 1e-4, "Normal": ("bump", 0)}),
             "shader": ("ShaderNodeBsdfPrincipled", {}, {
-                "Base Color": ("color", 0), "Subsurface Color": ("color", 0),
-                "Subsurface": 0.001, "Subsurface Radius": ("ssr", 0),
+                "Base Color": ("color", 0),
+                "Subsurface Weight": 0.001, "Subsurface Radius": ("ssr", 0),
                 "Roughness": ("roughness", 0), "Normal": ("bevel", 0)}),
         }
 
@@ -621,14 +619,25 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
         color_ramp.elements.new(0.5).color = (1, 1, 1, 1)
         color_ramp.elements.new(0.7).color = (0, 0, 0, 0)
 
-shader_node_category = ShaderNodeCategory("SH_NEW_PCB2BLENDER", "Pcb2Blender", items=(
-    NodeItem("ShaderNodeBsdfPcbSurfaceFinish"),
-    NodeItem("ShaderNodeBsdfPcbSolderMask"),
-    NodeItem("ShaderNodeBsdfPcbSilkscreen"),
-    NodeItem("ShaderNodeBsdfPcbBoardEdge"),
-    NodeItem("ShaderNodeBsdfSolder"),
-    NodeItem("ShaderNodePcbShader"),
-))
+class NODE_MT_category_shader_pcb2blender(Menu):
+    bl_idname = "NODE_MT_category_shader_pcb2blender"
+    bl_label = "Pcb2Blender"
+
+    def draw(self, context):
+        layout = self.layout
+
+        node_add_menu.add_node_type(layout, "ShaderNodeBsdfPcbSurfaceFinish")
+        node_add_menu.add_node_type(layout, "ShaderNodeBsdfPcbSolderMask")
+        node_add_menu.add_node_type(layout, "ShaderNodeBsdfPcbSilkscreen")
+        node_add_menu.add_node_type(layout, "ShaderNodeBsdfPcbBoardEdge")
+        node_add_menu.add_node_type(layout, "ShaderNodeBsdfSolder")
+        node_add_menu.add_node_type(layout, "ShaderNodePcbShader")
+
+        node_add_menu.draw_assets_for_catalog(layout, self.bl_label)
+
+def menu_draw(self, context):
+    self.layout.separator()
+    self.layout.menu("NODE_MT_category_shader_pcb2blender")
 
 classes = (
     ShaderNodeBsdfPcbSurfaceFinish,
@@ -637,6 +646,7 @@ classes = (
     ShaderNodeBsdfPcbBoardEdge,
     ShaderNodeBsdfSolder,
     ShaderNodePcbShader,
+    NODE_MT_category_shader_pcb2blender,
 )
 
 def register():
@@ -645,10 +655,10 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    register_node_category("SHADER", shader_node_category)
+    bpy.types.NODE_MT_shader_node_add_all.append(menu_draw)
 
 def unregister():
-    unregister_node_category("SHADER", shader_node_category)
+    bpy.types.NODE_MT_shader_node_add_all.remove(menu_draw)
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
