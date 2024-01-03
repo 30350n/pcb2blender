@@ -1,4 +1,4 @@
-[![blender](https://img.shields.io/badge/blender-3.6.0-orange)](https://www.blender.org/)
+[![blender](https://img.shields.io/badge/blender-4.0.0-orange)](https://www.blender.org/)
 [![kicad](https://img.shields.io/badge/kicad-7.0.0-blue)](https://www.kicad.org/)
 [![gplv3](https://img.shields.io/badge/license-GPLv3-lightgrey)](https://www.gnu.org/licenses/gpl-3.0.txt)
 

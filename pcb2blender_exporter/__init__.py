@@ -4,7 +4,7 @@ from pathlib import Path
 from .ui import SettingsDialog
 from .export import export_pcb3d, get_boarddefs
 
-__version__ = "2.7"
+__version__ = "2.8"
 
 class Pcb2BlenderExporter(pcbnew.ActionPlugin):
     def defaults(self):
