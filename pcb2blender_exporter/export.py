@@ -283,11 +283,15 @@ def init_tempdir():
         try:
             shutil.rmtree(tempdir)
         except OSError:
-            # try to delete all files first
-            for file in tempdir.glob("**/*"):
-                if file.is_file():
-                    file.unlink()
-            shutil.rmtree(tempdir)
+            try:
+                # try to delete all files first
+                for file in tempdir.glob("**/*"):
+                    if file.is_file():
+                        file.unlink()
+                shutil.rmtree(tempdir)
+            except OSError:
+                # if this stil doesn't work, fuck it
+                return
     tempdir.mkdir()
 
 def hex2rgb(hex_string):
