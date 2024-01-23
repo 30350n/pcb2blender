@@ -12,6 +12,8 @@ from autopep8 import main as autopep8
 from git import Repo
 from pytest import main as pytest
 
+from ._error_helper import *
+
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
@@ -19,19 +21,19 @@ def generate_release():
     info("running autopep8 ... ", end="")
     autopep8(["", "--recursive", "--in-place", "."])
     if Repo().is_dirty():
-        error("repo is dirty (stash changes before generating a release)")
+        return error("repo is dirty (stash changes before generating a release)")
 
     if Repo().head.is_detached:
-        error("repo is in detached head state")
+        return error("repo is in detached head state")
     if "up to date" not in Repo().git.status():
-        error("current commit is not pushed")
+        return error("current commit is not pushed")
     if Repo().tags[-1].commit != Repo().commit():
-        error("current commit is not tagged")
+        return error("current commit is not tagged")
 
     with patch.object(sys, "argv", ["", "-q"]):
         info("running pytest ...")
         if (exit_code := pytest()) != 0:
-            error(f"tests failed with {exit_code}")
+            return error(f"tests failed with {exit_code}")
 
     info(f"generating release for {Repo().tags[-1]} ... ")
 
@@ -52,7 +54,7 @@ def generate_release():
         Path(__file__).parent / "pcb2blender_importer",
     )
 
-    success("done.")
+    success("generated release!")
 
 def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     repo = Repo()
@@ -79,7 +81,7 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
         metadata_version = {
             "version": version[1:],
             "status": "stable",
-            "kicad_version": kicad_version[1:]
+            "kicad_version": kicad_version[1:],
         }
 
         metadata["versions"] = [metadata_version]
@@ -206,29 +208,6 @@ METADATA = {
         "homepage": ORIGIN,
     },
 }
-
-COLOR_INFO = "\033[94m"
-COLOR_HINT = "\033[2;3m"
-COLOR_SUCCESS = "\033[92m"
-COLOR_WARNING = "\033[93m"
-COLOR_ERROR = "\033[91m"
-COLOR_END = "\033[0m"
-
-def info(msg, end="\n"):
-    print(f"{COLOR_INFO}{msg}{COLOR_END}", end=end, flush=True)
-
-def hint(msg):
-    print(f"{COLOR_HINT}({msg}){COLOR_END}")
-
-def success(msg):
-    print(f"{COLOR_SUCCESS}{msg}{COLOR_END}")
-
-def warning(msg):
-    print(f"{COLOR_WARNING}warning: {msg}{COLOR_END}")
-
-def error(msg):
-    print(f"\n{COLOR_ERROR}error: {msg}{COLOR_END}", file=sys.stderr)
-    exit()
 
 if __name__ == "__main__":
     generate_release()

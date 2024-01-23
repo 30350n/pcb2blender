@@ -7,3 +7,6 @@
 [submodule "pcb2blender_importer/blender_addon_utils"]
 	path = pcb2blender_importer/blender_addon_utils
 	url = https://github.com/30350n/blender_addon_utils
+[submodule "_error_helper"]
+	path = _error_helper
+	url = https://github.com/30350n/error_helper
