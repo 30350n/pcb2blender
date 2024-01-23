@@ -48,7 +48,7 @@ class SettingsDialog(wx.Dialog):
 
         info = wx.StaticBoxSizer(wx.StaticBox(panel, label="Info"), orient=wx.VERTICAL)
 
-        text_detected = wx.StaticText(panel, label=f"Detected {len(boarddefs)} PCBs.")
+        text_detected = wx.StaticText(panel, label=f"Detected {len(boarddefs)} Boards.")
         info.Add(text_detected, flag=wx.ALL, border=5)
 
         for name, boarddef in sorted(boarddefs.items()):
