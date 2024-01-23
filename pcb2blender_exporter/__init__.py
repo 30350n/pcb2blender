@@ -5,7 +5,7 @@ import pcbnew, wx
 from .export import export_pcb3d, get_boarddefs
 from .ui import SettingsDialog
 
-__version__ = "2.8"
+__version__ = "2.9"
 
 class Pcb2BlenderExporter(pcbnew.ActionPlugin):
     def defaults(self):
