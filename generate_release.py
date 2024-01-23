@@ -177,14 +177,16 @@ KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, i
 Blender and start creating!
 
 (Note for Linux/macOS users: If you run into any issues, make sure you're running python 3.10).
-""").strip()
+
+If you want to support this project, you can do so at https://github.com/sponsors/30350n
+""").replace("\n ", "\n").strip()
 
 METADATA_CONTACT = {
     "name": "Bobbe",
     "contact": {
         "web": "https://30350n.de/",
         "github": "https://github.com/30350n",
-        "discord": "Bobbe#8552"
+        "discord": "30350n"
     },
 }
 
