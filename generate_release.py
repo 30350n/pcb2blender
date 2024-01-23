@@ -12,7 +12,7 @@ from autopep8 import main as autopep8
 from git import Repo
 from pytest import main as pytest
 
-from ._error_helper import *
+from _error_helper import *
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
