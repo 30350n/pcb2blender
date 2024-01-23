@@ -1,5 +1,6 @@
-import wx
 from pathlib import Path
+
+import wx
 
 class SettingsDialog(wx.Dialog):
     def __init__(self, parent, boarddefs, ignored):

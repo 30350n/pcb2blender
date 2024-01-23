@@ -1,12 +1,12 @@
-import pcbnew
-from pcbnew import ToMM, PLOT_CONTROLLER, PLOT_FORMAT_SVG, DRILL_MARKS_NO_DRILL_SHAPE
-
-import tempfile, shutil, struct, re
-from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
+import re, shutil, struct, tempfile
 from dataclasses import dataclass, field
 from enum import IntEnum
+from pathlib import Path
 from typing import List, Tuple
+from zipfile import ZIP_DEFLATED, ZipFile
+
+import pcbnew
+from pcbnew import DRILL_MARKS_NO_DRILL_SHAPE, PLOT_CONTROLLER, PLOT_FORMAT_SVG, ToMM
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -290,7 +290,7 @@ def init_tempdir():
                         file.unlink()
                 shutil.rmtree(tempdir)
             except OSError:
-                # if this stil doesn't work, fuck it
+                # if this still doesn't work, fuck it
                 return
     tempdir.mkdir()
 

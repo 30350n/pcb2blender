@@ -4,5 +4,20 @@ max_line_length = 96
 ignore = "E12,E13,E201,E202,E221,E241,E261,E302,E305,E401,E402"
 exclude = "site-packages"
 
+[tool.isort]
+line_length = 96
+lines_after_imports = 1
+combine_as_imports = true
+combine_straight_imports = true
+multi_line_output = 5
+known_blender = [
+    "addon_utils", "bpy", "bpy_extras", "bl_ui", "bmesh", "io_scene_x3d", "mathutils"
+]
+known_pcbnew = ["pcbnew", "wx"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "BLENDER", "PCBNEW", "FIRSTPARTY", "LOCALFOLDER"]
+
 [tool.pytest.ini_options]
 addopts = "--ignore-glob=*site-packages*"
+
+[tool.codespell]
+ignore-words-list = "tht"

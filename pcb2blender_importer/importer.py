@@ -1,25 +1,25 @@
-import bpy, bmesh, addon_utils
-from bpy_extras.io_utils import ImportHelper, orientation_helper, axis_conversion
-from bpy.props import *
-from mathutils import Vector, Matrix
-
-import tempfile, random, shutil, re, struct, io
-from math import inf, radians
-from pathlib import Path
-from zipfile import ZipFile, BadZipFile, Path as ZipPath
+import io, random, re, shutil, struct, tempfile
 from dataclasses import dataclass
 from enum import Enum
-import numpy as np
+from math import inf, radians
+from pathlib import Path
+from zipfile import BadZipFile, Path as ZipPath, ZipFile
 
-from skia import SVGDOM, Stream, Surface, Color4f
-SKIA_MAGIC = 0.282222222
+import numpy as np
 from PIL import Image, ImageOps
+from skia import SVGDOM, Color4f, Stream, Surface
+
+import addon_utils, bmesh, bpy
+from bpy.props import *
+from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
+from io_scene_x3d import (
+    ImportX3D, X3D_PT_import_transform, import_x3d,
+    menu_func_import as menu_func_import_x3d_original
+)
+from mathutils import Matrix, Vector
 
 from .blender_addon_utils import ErrorHelper
 from .materials import *
-
-from io_scene_x3d import ImportX3D, X3D_PT_import_transform, import_x3d
-from io_scene_x3d import menu_func_import as menu_func_import_x3d_original
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -396,7 +396,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         # cut boards
 
-        # TODO: maybe handle this differently by always providing atleast one board def?
+        # TODO: maybe handle this differently by always providing at least one board def?
         if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name
@@ -864,8 +864,11 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
     @staticmethod
     def svg2img(svg_path, dpi):
         svg = SVGDOM.MakeFromStream(Stream.MakeFromFile(str(svg_path)))
-        width, height = svg.containerSize()
+
+        SKIA_MAGIC = 0.282222222
         dpmm = dpi * INCH_TO_MM * SKIA_MAGIC
+
+        width, height = svg.containerSize()
         pixels_width, pixels_height = round(width * dpmm), round(height * dpmm)
         surface = Surface(pixels_width, pixels_height)
 

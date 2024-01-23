@@ -1,14 +1,13 @@
-from .mat4cad.core import Material, rgb2hex, hex2rgb, srgb2lin, lin2srgb
-from .mat4cad.colors import PCB_YELLOW
-from .mat4cad.blender import register as register_mat4cad, unregister as unregister_mat4cad
-from .custom_node_utils import *
-
 import bpy
 from bl_ui import node_add_menu
 from bpy.props import EnumProperty
-from mathutils import Vector, Color
-
 from bpy.types import Menu, NodeTree, ShaderNodeCustomGroup
+from mathutils import Color, Vector
+
+from .custom_node_utils import *
+from .mat4cad.blender import register as register_mat4cad, unregister as unregister_mat4cad
+from .mat4cad.colors import PCB_YELLOW
+from .mat4cad.core import Material, hex2rgb, lin2srgb, rgb2hex, srgb2lin
 
 LAYER_BOARD_EDGE = "pcb_board_edge"
 LAYER_THROUGH_HOLES = "pcb_through_holes"

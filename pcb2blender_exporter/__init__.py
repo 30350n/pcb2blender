@@ -1,8 +1,9 @@
-import pcbnew, wx
 from pathlib import Path
 
-from .ui import SettingsDialog
+import pcbnew, wx
+
 from .export import export_pcb3d, get_boarddefs
+from .ui import SettingsDialog
 
 __version__ = "2.8"
 

@@ -1,10 +1,10 @@
+import numpy as np
+
 import bpy
 from bpy.props import *
 
-import numpy as np
-
-from .importer import MM_TO_M
 from .custom_node_utils import setup_node_tree
+from .importer import MM_TO_M
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
     """Add a solder joint"""

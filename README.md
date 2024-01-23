@@ -43,7 +43,7 @@ them, after last minute board revisions.
   `Edit -> Preferences -> Add-ons -> Install`<br>
   (you need to install the actual zip file, don't unpack it!)
   and enable it (enabling the addon for the first time will take a few minutes).
-  
+
 ### Note on python version (Linux and macOS)
 
 On Windows, KiCad and Blender both ship with their own bundled python version

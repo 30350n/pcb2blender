@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
-from git import Repo
-from zipfile import ZipFile, ZIP_DEFLATED
+import json, re, shutil, sys
 from hashlib import sha256
 from itertools import chain
-from autopep8 import main as autopep8
-from pytest import main as pytest
+from pathlib import Path
 from unittest.mock import patch
-import json, shutil, requests, re, sys
+from zipfile import ZIP_DEFLATED, ZipFile
+
+import requests
+from autopep8 import main as autopep8
+from git import Repo
+from pytest import main as pytest
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"

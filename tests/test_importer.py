@@ -1,10 +1,10 @@
-import bpy
-
-from itertools import product, chain
+from itertools import chain, product
 from pathlib import Path
 from tempfile import gettempdir
 
 import pytest
+
+import bpy
 
 test_filepaths = list((Path(__file__).parent / "test_pcbs").resolve().glob("**/*.pcb3d"))
 
