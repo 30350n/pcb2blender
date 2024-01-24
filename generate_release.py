@@ -18,7 +18,7 @@ RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
 def generate_release():
-    info("running autopep8 ... ", end="")
+    info("running autopep8 ... ", end="", flush=True)
     autopep8(["", "--recursive", "--in-place", "."])
     if Repo().is_dirty():
         return error("repo is dirty (stash changes before generating a release)")
