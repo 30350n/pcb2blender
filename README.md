@@ -26,8 +26,7 @@ them, after last minute board revisions.
 
 ### Exporter (KiCad)
 
-- (not available yet) via the builtin plugin manager<br>
-  `Tools -> Plugin and Content Manager -> Plugins -> pcb2blender`
+- `Tools -> Plugin and Content Manager -> Plugins -> pcb2blender`
 
 - (manual) Download the `pcb2blender_exporter.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),
