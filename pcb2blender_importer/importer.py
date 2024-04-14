@@ -504,6 +504,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                 component = self.component_cache[url]
                 instance = bpy.data.objects.new(component.name, component)
+                add_smooth_by_angle_modifier(context, instance)
                 instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
                 related_objects.append(instance)
@@ -1024,9 +1025,6 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         context.view_layer.objects.active = objects[0]
 
         bpy.ops.object.shade_smooth()
-        for obj in objects:
-            if obj.type == "MESH":
-                obj.data.use_auto_smooth = True
 
         if self.join:
             meshes = {obj.data for obj in objects if obj.type == "MESH"}
@@ -1040,9 +1038,13 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             joined_obj = context.object
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
             joined_obj.data.name = joined_obj.name
+            add_smooth_by_angle_modifier(context, joined_obj)
             objects = [joined_obj]
         else:
             bpy.ops.object.transform_apply(location=False, rotation=False)
+            for obj in objects:
+                if obj.type == "MESH":
+                    add_smooth_by_angle_modifier(context, obj)
 
         if self.tris_to_quads:
             bpy.ops.object.mode_set(mode="EDIT")
@@ -1081,6 +1083,24 @@ class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
     @classmethod
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
+
+RESOURCE_PATH = Path(bpy.utils.resource_path("LOCAL"))
+SMOOTH_BY_ANGLE_ASSET_PATH = str(
+    RESOURCE_PATH / "datafiles" / "assets" / "geometry_nodes" / "smooth_by_angle.blend"
+)
+SMOOTH_BY_ANGLE_NODE_GROUP_NAME = "Smooth by Angle"
+def add_smooth_by_angle_modifier(context, obj):
+    global SMOOTH_BY_ANGLE_NODE_GROUP_NAME
+
+    smooth_by_angle_node_group = bpy.data.node_groups.get(SMOOTH_BY_ANGLE_NODE_GROUP_NAME)
+    if not smooth_by_angle_node_group or smooth_by_angle_node_group.type != "GEOMETRY":
+        with bpy.data.libraries.load(SMOOTH_BY_ANGLE_ASSET_PATH) as (data_from, data_to):
+            data_to.node_groups = [SMOOTH_BY_ANGLE_NODE_GROUP_NAME]
+        smooth_by_angle_node_group = data_to.node_groups[0]
+        SMOOTH_BY_ANGLE_NODE_GROUP_NAME = smooth_by_angle_node_group.name
+
+    modifier = obj.modifiers.new("Smooth by Angle", "NODES")
+    modifier.node_group = smooth_by_angle_node_group
 
 def has_svg2blender():
     return addon_utils.check("svg2blender_importer") == (True, True)
