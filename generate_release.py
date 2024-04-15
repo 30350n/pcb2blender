@@ -17,17 +17,25 @@ from _error_helper import *
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
 
+FILE_DIR = Path(__file__).parent
+KICAD_ADDON_DIR = FILE_DIR / "pcb2blender_exporter"
+BLENDER_ADDON_DIR = FILE_DIR / "pcb2blender_importer"
+
 def generate_release():
-    info("running autopep8 ... ", end="", flush=True)
+    info("running autopep8 ...")
     autopep8(["", "--recursive", "--in-place", "."])
-    if Repo().is_dirty():
+
+    repo = Repo()
+    if repo.is_dirty():
         return error("repo is dirty (stash changes before generating a release)")
 
-    if Repo().head.is_detached:
+    if repo.head.is_detached:
         return error("repo is in detached head state")
-    if "up to date" not in Repo().git.status():
+    if "up to date" not in repo.git.status():
         return error("current commit is not pushed")
-    if Repo().tags[-1].commit != Repo().commit():
+
+    tags = list(reversed(sorted(repo.tags, key=lambda tag: tag.commit.committed_datetime)))
+    if tags[0].commit != repo.commit():
         return error("current commit is not tagged")
 
     with patch.object(sys, "argv", ["", "-q"]):
@@ -35,7 +43,7 @@ def generate_release():
         if (exit_code := pytest()) != 0:
             return error(f"tests failed with {exit_code}")
 
-    info(f"generating release for {Repo().tags[-1]} ... ")
+    info(f"generating release for {tags[0]} ... ")
 
     ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
     for path in RELEASE_DIRECTORY.glob("*.zip*"):
@@ -44,24 +52,19 @@ def generate_release():
         shutil.move(path, ARCHIVE_DIRECTORY / path.name)
 
     generate_kicad_addon(
-        Path(__file__).parent / "pcb2blender_exporter",
+        KICAD_ADDON_DIR,
         METADATA,
+        tags,
         "images/icon.png",
         ["images/blender_icon_32x32.png"],
     )
 
-    generate_blender_addon(
-        Path(__file__).parent / "pcb2blender_importer",
-    )
+    generate_blender_addon(BLENDER_ADDON_DIR, tags)
 
     success("generated release!")
 
-def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
-    repo = Repo()
-    tags = list(reversed(sorted(repo.tags, key=lambda tag: tag.commit.committed_datetime)))
-
-    latest_tag = tags[0]
-    version, kicad_version, _ = latest_tag.name.split("-")
+def generate_kicad_addon(path, metadata, tags, icon_path=None, extra_files=[]):
+    version, kicad_version, _ = tags[0].name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
         warning(f"tag addon version '{version[1:]}' doesn't match package version "
@@ -100,7 +103,7 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
         shutil.copy((path / icon_path), metadata_dir / "icon.png")
 
     metadata_version["download_sha256"] = zip_hash
-    download_url = f"{ORIGIN}/releases/download/{latest_tag.name}/{zip_path.name}"
+    download_url = f"{ORIGIN}/releases/download/{tags[0].name}/{zip_path.name}"
     metadata_version["download_url"] = download_url
     with ZipFile(zip_path, mode="r") as zip_file:
         metadata_version["download_size"] = sum(
@@ -122,12 +125,8 @@ def generate_kicad_addon(path, metadata, icon_path=None, extra_files=[]):
     metadata_json = json.dumps(metadata, indent=4)
     (metadata_dir / "metadata.json").write_text(metadata_json)
 
-def generate_blender_addon(path, extra_files=[]):
-    repo = Repo()
-    tags = list(reversed(sorted(repo.tags, key=lambda tag: tag.commit.committed_datetime)))
-
-    latest_tag = tags[0]
-    version, _, blender_version = latest_tag.name.split("-")
+def generate_blender_addon(path, tags, extra_files=[]):
+    version, _, blender_version = tags[0].name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
         warning(f"tag addon version '{version[1:]}' doesn't match package version "
