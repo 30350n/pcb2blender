@@ -831,6 +831,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         modifier = obj.modifiers.new(mod_name, type="BOOLEAN")
         modifier.operation = mode
         modifier.object = cutter
+        modifier.use_self = True
         context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=mod_name)
 
