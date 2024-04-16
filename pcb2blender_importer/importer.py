@@ -1084,7 +1084,7 @@ class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
 
-RESOURCE_PATH = Path(bpy.utils.resource_path("LOCAL"))
+RESOURCE_PATH = Path(bpy.utils.resource_path("SYSTEM"))
 SMOOTH_BY_ANGLE_ASSET_PATH = str(
     RESOURCE_PATH / "datafiles" / "assets" / "geometry_nodes" / "smooth_by_angle.blend"
 )
