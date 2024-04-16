@@ -504,7 +504,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                 component = self.component_cache[url]
                 instance = bpy.data.objects.new(component.name, component)
-                add_smooth_by_angle_modifier(context, instance)
+                add_smooth_by_angle_modifier(instance)
                 instance.matrix_world = matrix_all @ matrix_instance @ MATRIX_FIX_SCALE_INV
                 context.collection.objects.link(instance)
                 related_objects.append(instance)
@@ -1038,13 +1038,13 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             joined_obj = context.object
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
             joined_obj.data.name = joined_obj.name
-            add_smooth_by_angle_modifier(context, joined_obj)
+            add_smooth_by_angle_modifier(joined_obj)
             objects = [joined_obj]
         else:
             bpy.ops.object.transform_apply(location=False, rotation=False)
             for obj in objects:
                 if obj.type == "MESH":
-                    add_smooth_by_angle_modifier(context, obj)
+                    add_smooth_by_angle_modifier(obj)
 
         if self.tris_to_quads:
             bpy.ops.object.mode_set(mode="EDIT")
@@ -1084,12 +1084,18 @@ class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
 
-RESOURCE_PATH = Path(bpy.utils.resource_path("LOCAL"))
+def get_internal_asset_path():
+    for path_type in ("LOCAL", "SYSTEM", "USER"):
+        path = Path(bpy.utils.resource_path(path_type)) / "datafiles" / "assets"
+        if path.exists():
+            return path
+    assert False
+
 SMOOTH_BY_ANGLE_ASSET_PATH = str(
-    RESOURCE_PATH / "datafiles" / "assets" / "geometry_nodes" / "smooth_by_angle.blend"
+    get_internal_asset_path() / "geometry_nodes" / "smooth_by_angle.blend"
 )
 SMOOTH_BY_ANGLE_NODE_GROUP_NAME = "Smooth by Angle"
-def add_smooth_by_angle_modifier(context, obj):
+def add_smooth_by_angle_modifier(obj):
     global SMOOTH_BY_ANGLE_NODE_GROUP_NAME
 
     smooth_by_angle_node_group = bpy.data.node_groups.get(SMOOTH_BY_ANGLE_NODE_GROUP_NAME)
