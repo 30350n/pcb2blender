@@ -453,23 +453,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                             continue
                         keep_verts = keep_verts.union(edge.verts)
 
-                board_edge_verts = board_edge_verts - keep_verts
-
-                MERGE_DISTANCE = pcb.stackup.thickness_mm * MM_TO_M * 0.5
-                MERGE_DISTANCE_SQ = MERGE_DISTANCE ** 2
-
-                targetmap = {}
-                for keep_vert in keep_verts:
-                    for vert in board_edge_verts - keep_verts:
-                        if (keep_vert.co - vert.co).length_squared < MERGE_DISTANCE_SQ:
-                            targetmap[vert] = keep_vert
-                            board_edge_verts.remove(vert)
-
-                edge_doubles = bmesh.ops.find_doubles(bm, verts=list(board_edge_verts),
-                    dist=MERGE_DISTANCE)
-
-                targetmap = targetmap | edge_doubles["targetmap"]
-                bmesh.ops.weld_verts(bm, targetmap=targetmap)
+                dissolve_verts = list(board_edge_verts - keep_verts)
+                merge_distance = pcb.stackup.thickness_mm * MM_TO_M * 0.5
+                doubles = bmesh.ops.find_doubles(
+                    bm, verts=dissolve_verts, keep_verts=list(keep_verts), dist=merge_distance
+                )
+                bmesh.ops.weld_verts(bm, targetmap=doubles["targetmap"])
 
                 bm.to_mesh(board_obj.data)
                 bm.free()
