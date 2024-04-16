@@ -222,19 +222,19 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
         self.update_props(context)
 
 MASK_COLOR_MAP = {
-    "GREEN":       (hex2rgb("28a125"), hex2rgb("155211")),
-    "RED":         (hex2rgb("e50007"), hex2rgb("731114")),
-    "YELLOW":      (hex2rgb("dac92b"), hex2rgb("687c19")),
-    "BLUE":        (hex2rgb("0d5eaa"), hex2rgb("053059")),
-    "PURPLE":      (hex2rgb("6b2baa"), hex2rgb("361359")),
+    "GREEN":       (hex2rgb("43a142"), hex2rgb("22521f")),
+    "RED":         (hex2rgb("de544c"), hex2rgb("733a38")),
+    "YELLOW":      (hex2rgb("dacb57"), hex2rgb("6a7c30")),
+    "BLUE":        (hex2rgb("3b69aa"), hex2rgb("1c3659")),
+    "PURPLE":      (hex2rgb("7448aa"), hex2rgb("3b2359")),
     "WHITE":       (hex2rgb("d3cfc9"), hex2rgb("e1dddc")),
     "BLACK":       (hex2rgb("10100f"), hex2rgb("000000")),
-    "MATTE_BLACK": (hex2rgb("000000"), hex2rgb("000000")),
+    "MATTE_BLACK": (hex2rgb("191919"), hex2rgb("191919")),
 }
-DEFAULT_MASK_ROUGHNESS = 0.25
+DEFAULT_MASK_ROUGHNESS = 0.45
 MASK_ROUGHNESS_MAP = {
-    "WHITE": 0.15,
-    "MATTE_BLACK": 1.6,
+    "WHITE": 0.4,
+    "MATTE_BLACK": 0.8,
 }
 
 class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
