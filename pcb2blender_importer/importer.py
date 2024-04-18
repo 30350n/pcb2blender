@@ -835,6 +835,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         modifier.operation = mode
         modifier.object = cutter
         modifier.use_self = True
+
+        if (modifier_index := len(obj.modifiers) - 1) > 0:
+            obj.modifiers.move(modifier_index, 0)
         context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=mod_name)
 
