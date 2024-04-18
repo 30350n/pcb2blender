@@ -472,6 +472,26 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                 bmesh.ops.weld_verts(bm, targetmap=targetmap | planar_edge_doubles["targetmap"])
 
+                remaining_top_edge_verts = set()
+                remaining_bot_edge_verts = set()
+                for vert in planar_edge_doubles["targetmap"].values():
+                    if vert not in planar_edge_doubles["targetmap"]:
+                        if vert.co.z > 0:
+                            remaining_top_edge_verts.add(vert)
+                        else:
+                            remaining_bot_edge_verts.add(vert)
+
+                for top_vert in remaining_top_edge_verts:
+                    for bot_vert in (edge.other_vert(top_vert) for edge in top_vert.link_edges):
+                        if bot_vert not in remaining_bot_edge_verts:
+                            continue
+                        if (top_vert.co.xy - bot_vert.co.xy).length_squared > MERGE_DISTANCE_SQ:
+                            continue
+                        mean_xy = (top_vert.co.xy + bot_vert.co.xy) / 2
+                        top_vert.co.xy = bot_vert.co.xy = mean_xy
+                        remaining_bot_edge_verts.remove(bot_vert)
+                        break
+
                 bm.to_mesh(board_obj.data)
                 bm.free()
 
