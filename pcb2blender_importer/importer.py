@@ -458,24 +458,33 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 merge_distance = pcb.stackup.thickness_mm * MM_TO_M * 0.5
                 merge_distance_sq = merge_distance ** 2
 
+                # TODO: doing this separately for top/bottom verts could improve performance
+
                 targetmap = {}
-                for keep_vert in keep_verts:
-                    for vert in dissolve_verts.copy():
-                        if (keep_vert.co - vert.co).length_squared < merge_distance_sq:
-                            targetmap[vert] = keep_vert
-                            dissolve_verts.remove(vert)
+                for dissolve_vert in dissolve_verts:
+                    closest_keep_vert = None
+                    closest_distance = inf
+                    for keep_vert in keep_verts:
+                        distance = (keep_vert.co - dissolve_vert.co).length_squared
+                        if distance < closest_distance:
+                            closest_keep_vert = keep_vert
+                            closest_distance = distance
+                    if closest_distance < merge_distance_sq:
+                        targetmap[dissolve_vert] = closest_keep_vert
+
+                dissolve_verts.difference_update(targetmap)
 
                 # merge the verts that didn't get merged to any keep_verts
                 planar_edge_doubles = bmesh.ops.find_doubles(
                     bm, verts=list(dissolve_verts), dist=merge_distance
-                )
+                )["targetmap"]
 
-                bmesh.ops.weld_verts(bm, targetmap=targetmap | planar_edge_doubles["targetmap"])
+                bmesh.ops.weld_verts(bm, targetmap=targetmap | planar_edge_doubles)
 
                 remaining_top_edge_verts = set()
                 remaining_bot_edge_verts = set()
-                for vert in planar_edge_doubles["targetmap"].values():
-                    if vert not in planar_edge_doubles["targetmap"]:
+                for vert in planar_edge_doubles.values():
+                    if vert not in planar_edge_doubles:
                         if vert.co.z > 0:
                             remaining_top_edge_verts.add(vert)
                         else:
