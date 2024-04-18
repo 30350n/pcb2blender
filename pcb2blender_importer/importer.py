@@ -455,19 +455,19 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                 dissolve_verts = board_edge_verts - keep_verts
 
-                MERGE_DISTANCE = pcb.stackup.thickness_mm * MM_TO_M * 0.5
-                MERGE_DISTANCE_SQ = MERGE_DISTANCE ** 2
+                merge_distance = pcb.stackup.thickness_mm * MM_TO_M * 0.5
+                merge_distance_sq = merge_distance ** 2
 
                 targetmap = {}
                 for keep_vert in keep_verts:
                     for vert in dissolve_verts.copy():
-                        if (keep_vert.co - vert.co).length_squared < MERGE_DISTANCE_SQ:
+                        if (keep_vert.co - vert.co).length_squared < merge_distance_sq:
                             targetmap[vert] = keep_vert
                             dissolve_verts.remove(vert)
 
                 # merge the verts that didn't get merged to any keep_verts
                 planar_edge_doubles = bmesh.ops.find_doubles(
-                    bm, verts=list(dissolve_verts), dist=MERGE_DISTANCE
+                    bm, verts=list(dissolve_verts), dist=merge_distance
                 )
 
                 bmesh.ops.weld_verts(bm, targetmap=targetmap | planar_edge_doubles["targetmap"])
@@ -485,7 +485,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     for bot_vert in (edge.other_vert(top_vert) for edge in top_vert.link_edges):
                         if bot_vert not in remaining_bot_edge_verts:
                             continue
-                        if (top_vert.co.xy - bot_vert.co.xy).length_squared > MERGE_DISTANCE_SQ:
+                        if (top_vert.co.xy - bot_vert.co.xy).length_squared > merge_distance_sq:
                             continue
                         mean_xy = (top_vert.co.xy + bot_vert.co.xy) / 2
                         top_vert.co.xy = bot_vert.co.xy = mean_xy
