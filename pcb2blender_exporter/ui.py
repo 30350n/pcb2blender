@@ -48,7 +48,9 @@ class SettingsDialog(wx.Dialog):
 
         info = wx.StaticBoxSizer(wx.StaticBox(panel, label="Info"), orient=wx.VERTICAL)
 
-        text_detected = wx.StaticText(panel, label=f"Detected {len(boarddefs)} Boards.")
+        n_boards = max(1, len(boarddefs))
+        plural = "" if n_boards == 1 else "s"
+        text_detected = wx.StaticText(panel, label=f"Detected {n_boards} Board{plural}.")
         info.Add(text_detected, flag=wx.ALL, border=5)
 
         for name, boarddef in sorted(boarddefs.items()):
@@ -83,10 +85,10 @@ class SettingsDialog(wx.Dialog):
             "PCB3D_TL_<boardname> at its top left corner and one with "\
             "PCB3D_BR_<boardname> at its bottom right corner.\n\n"\
             "To stack a board A to another board B, add a Text Item with the text "\
-            "PCB3D_STACK_<boardnameA>_ONTO_<boardnameB>_<zoffset>\n"\
+            "PCB3D_STACK_<boardA>_ONTO_<boardB>_<zoffset>\n"\
             "at the location (relative to the top left corner of board B), "\
             "where you want the top left corner of A to be.\n"\
-            "(zoffset is given in mm, 10.0 works great for 2.54mm headers and sockets)"
+            "(zoffset is given in mm, 10.0 is a good default for 2.54mm headers and sockets)"
         boarddef_hint_text = wx.StaticText(panel, label=boarddef_hint)
         boarddef_hint_text.Wrap(400)
         hint.Add(boarddef_hint_text, flag=wx.ALL, border=5)
