@@ -306,8 +306,14 @@ svg_header_regex = re.compile(
 )
 svg_header_sub = "<svg\\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
 
-stackup_regex = re.compile(r"\(stackup\s*((?:\s*\(.*\))*)\s*\)", re.MULTILINE)
-stackup_thickness_regex = re.compile(r"\(layer\s.*\(thickness\s+([^\)]*)\s*\)")
-stackup_mask_regex  = re.compile(r"\(layer\s+\"[FB].Mask\".*\(color\s+\"([^\)]*)\"\s*\)")
-stackup_silks_regex = re.compile(r"\(layer\s+\"[FB].SilkS\".*\(color\s+\"([^\)]*)\"\s*\)")
+stackup_regex = re.compile(
+    r"\(stackup\s*(?:\s*\([^\(\)]*(?:\([^\)]*\)\s*)*\)\s*)*\)", re.MULTILINE
+)
+stackup_thickness_regex = re.compile(r"\(thickness\s+([^\)]*)\s*\)")
+stackup_mask_regex  = re.compile(
+    r"\(layer\s+\"[FB].Mask\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+)
+stackup_silks_regex = re.compile(
+    r"\(layer\s+\"[FB].SilkS\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+)
 stackup_copper_finish_regex = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")
