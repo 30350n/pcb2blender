@@ -215,7 +215,7 @@ def get_stackup(board):
 
     tmp_path = get_temppath("pcb2blender_tmp.kicad_pcb")
     board.Save(str(tmp_path))
-    content = tmp_path.read_text()
+    content = tmp_path.read_text(encoding="utf-8")
 
     if not (match := stackup_regex.search(content)):
         return stackup
@@ -261,7 +261,7 @@ def export_layers(board, bounds, output_directory: Path):
         plot_controller.ClosePlot()
         filepath = filepath.rename(filepath.parent / f"{layer}.svg")
 
-        content = filepath.read_text()
+        content = filepath.read_text(encoding="utf-8")
         width  = f"{bounds[2]:.6f}mm"
         height = f"{bounds[3]:.6f}mm"
         viewBox = " ".join(f"{value:.6f}" for value in bounds)

@@ -638,10 +638,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         zip_path = ZipPath(file)
 
         with file.open(PCB) as pcb_file:
-            pcb_file_content = pcb_file.read().decode("UTF-8")
+            pcb_file_content = pcb_file.read().decode("utf-8")
             with open(extract_dir / PCB, "wb") as filtered_file:
                 filtered = regex_filter_components.sub("\\g<prefix>", pcb_file_content)
-                filtered_file.write(filtered.encode("UTF-8"))
+                filtered_file.write(filtered.encode("utf-8"))
 
         components = list({
             name for name in file.namelist()
@@ -956,7 +956,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
             filebrowser_params = context.space_data.params
             filename  = Path(filebrowser_params.filename)
-            directory = Path(filebrowser_params.directory.decode())
+            directory = Path(filebrowser_params.directory.decode("utf-8"))
 
             if filename.suffix == ".pcb3d":
                 if self.fpnl_path == "" or self.fpnl_path == self.last_fpnl_path:
