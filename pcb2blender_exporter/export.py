@@ -266,7 +266,7 @@ def export_layers(board, bounds, output_directory: Path):
         height = f"{bounds[3]:.6f}mm"
         viewBox = " ".join(f"{value:.6f}" for value in bounds)
         content = svg_header_regex.sub(svg_header_sub.format(width, height, viewBox), content)
-        filepath.write_text(content)
+        filepath.write_text(content, encoding="utf-8")
 
 def sanitized(name):
     return re.sub(r"[\W]+", "_", name)
