@@ -10,12 +10,12 @@ from PIL import Image, ImageOps
 from skia import SVGDOM, Color4f, Stream, Surface
 
 import addon_utils, bmesh, bpy
-from bpy.props import *
-from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
-from io_scene_x3d import (
+from bl_ext.blender_org.web3d_x3d_vrml2_format import (
     ImportX3D, X3D_PT_import_transform, import_x3d,
     menu_func_import as menu_func_import_x3d_original
 )
+from bpy.props import *
+from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
 from mathutils import Matrix, Vector
 
 from .blender_addon_utils import ErrorHelper
