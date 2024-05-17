@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-import json, re, shutil, sys
+import ast, json, re, shutil, sys
 from hashlib import sha256
 from itertools import chain
 from pathlib import Path
+from subprocess import DEVNULL, CalledProcessError, check_call
 from unittest.mock import patch
 from zipfile import ZIP_DEFLATED, ZipFile
 
-import requests
+import requests, toml
 from autopep8 import main as autopep8
 from git import Repo
 from pytest import main as pytest
@@ -16,6 +17,7 @@ from _error_helper import *
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
+TEMP_WHEEL_DIRECTORY = RELEASE_DIRECTORY / "wheels_tmp"
 
 FILE_DIR = Path(__file__).parent
 KICAD_ADDON_DIR = FILE_DIR / "pcb2blender_exporter"
@@ -63,6 +65,7 @@ def generate_release(skip_tests=False, ignore_git_issues=False):
     )
 
     generate_blender_addon(BLENDER_ADDON_DIR, tags)
+    generate_blender_extension(BLENDER_ADDON_DIR, tags)
 
     success("generated release!")
 
@@ -128,26 +131,25 @@ def generate_kicad_addon(path, metadata, tags, icon_path=None, extra_files=[]):
     metadata_json = json.dumps(metadata, indent=4)
     (metadata_dir / "metadata.json").write_text(metadata_json)
 
-def generate_blender_addon(path, tags, extra_files=[]):
+def generate_blender_addon(path, tags):
     version, _, blender_version = tags[0].name.split("-")
 
     if version[1:] != (package_version := get_package_version(path)):
         warning(f"tag addon version '{version[1:]}' doesn't match package version "
                 f"'{package_version}'")
 
-    if version[1:] != (bl_info_version := get_bl_info_version(path)):
+    if version[1:] != (bl_info_version := ".".join(get_bl_info_version(path)[:2])):
         warning(f"tag addon version '{version[1:]}' doesn't match addon version "
                 f"in bl_info '{bl_info_version}'")
 
-    if blender_version[1:] != (bl_info_bversion := get_bl_info_bversion(path)):
+    if blender_version[1:] != (bl_info_bversion := ".".join(get_bl_info_bversion(path)[:2])):
         warning(f"tag blender version '{version[1:]}' doesn't match blender version "
                 f"in bl_info '{bl_info_bversion}'")
 
     RELEASE_DIRECTORY.mkdir(exist_ok=True)
     zip_path = RELEASE_DIRECTORY / f"{path.name}_{version[1:].replace('.', '-')}.zip"
     with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
-        extra_paths = (path / extra for extra in extra_files)
-        for filepath in chain(path.glob("**/*.py"), extra_paths):
+        for filepath in path.glob("**/*.py"):
             if "site-packages" in str(filepath) or "docs" in str(filepath):
                 continue
             zip_file.write(filepath, filepath.relative_to(path.parent))
@@ -160,13 +162,84 @@ def generate_blender_addon(path, tags, extra_files=[]):
     metadata_dir = RELEASE_DIRECTORY / "metadata"
     metadata_dir.mkdir(exist_ok=True)
 
+def generate_blender_extension(path, tags):
+    version, _, blender_version = tags[0].name.split("-")
+
+    if version[1:] != (package_version := get_package_version(path)):
+        warning(f"tag addon version '{version[1:]}' doesn't match package version "
+                f"'{package_version}'")
+
+    if version[1:] != (bl_info_version := ".".join(get_bl_info_version(path)[:2])):
+        warning(f"tag addon version '{version[1:]}' doesn't match addon version "
+                f"in bl_info '{bl_info_version}'")
+
+    if blender_version[1:] != (bl_info_bversion := ".".join(get_bl_info_bversion(path)[:2])):
+        warning(f"tag blender version '{version[1:]}' doesn't match blender version "
+                f"in bl_info '{bl_info_bversion}'")
+
+    RELEASE_DIRECTORY.mkdir(exist_ok=True)
+
+    init_content = (path / "__init__.py").read_text()
+    dependencies = ast.literal_eval(extension_dependencies_regex.search(init_content).group(1))
+
+    if TEMP_WHEEL_DIRECTORY.is_dir():
+        shutil.rmtree(TEMP_WHEEL_DIRECTORY)
+    TEMP_WHEEL_DIRECTORY.mkdir()
+
+    for dependency in dependencies:
+        for blender_platform, wheel_platforms in SUPPORTED_PLATFORMS.items():
+            for wheel_platform in wheel_platforms:
+                try:
+                    check_call((
+                        "pip", "download", dependency, f"--dest={TEMP_WHEEL_DIRECTORY}",
+                        "--only-binary=:all:", f"--python-version={BLENDER_PYTHON}",
+                        f"--platform={wheel_platform}", "--quiet"
+                    ), stdout=DEVNULL, stderr=DEVNULL)
+                    break
+                except CalledProcessError:
+                    continue
+            else:
+                warning(f"failed to download '{dependency}' for '{blender_platform}'")
+
+    zip_path = RELEASE_DIRECTORY / f"{path.name}_extension_{version[1:].replace('.', '-')}.zip"
+    with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
+        for filepath in path.glob("**/*.py"):
+            if "site-packages" in str(filepath) or "docs" in str(filepath):
+                continue
+            if str(relative_path := filepath.relative_to(path)) == "__init__.py":
+                continue
+            zip_file.write(filepath, relative_path)
+        zip_file.writestr("__init__.py", extension_init_patch.sub("", init_content))
+
+        wheels = []
+        for filepath in TEMP_WHEEL_DIRECTORY.glob("*.whl"):
+            zip_file.write(filepath, f"wheels/{filepath.name}")
+            wheels.append(f"./wheels/{filepath.name}")
+
+        manifest = MANIFEST | {
+            "version": f"{version[1:]}.0",
+            "blender_version_min": ".".join(get_bl_info_bversion(path)),
+            "wheels": wheels,
+        }
+        zip_file.writestr("blender_manifest.toml", toml.dumps(manifest))
+
+    shutil.rmtree(TEMP_WHEEL_DIRECTORY)
+
+    zip_hash_path = Path(f"{str(zip_path)}.sha256")
+    with open(zip_path, "rb") as file:
+        zip_hash = sha256(file.read()).hexdigest()
+        zip_hash_path.write_text(zip_hash)
+
+    metadata_dir = RELEASE_DIRECTORY / "metadata"
+    metadata_dir.mkdir(exist_ok=True)
+
 def get_bl_info_version(path):
     group = version_regex.search((path / "__init__.py").read_text()).groups()[0]
-    return ".".join(s.strip() for s in group.split(",")[:2])
+    return tuple(s.strip() for s in group.split(","))
 
 def get_bl_info_bversion(path):
     group = bversion_regex.search((path / "__init__.py").read_text()).groups()[0]
-    return ".".join(s.strip() for s in group.split(",")[:2])
+    return tuple(s.strip() for s in group.split(","))
 
 def get_package_version(path):
     return package_version_regex.search((path / "__init__.py").read_text()).groups()[0]
@@ -175,6 +248,7 @@ version_regex  = re.compile(r"bl_info\s*=\s*{[^}]*\"version\"\s*:\s*\(([^^\)]*)\
 bversion_regex = re.compile(r"bl_info\s*=\s*{[^}]*\"blender\"\s*:\s*\(([^^\)]*)\)\s*,[^}]*}")
 package_version_regex  = re.compile(r"__version__\s*=\s*\"([^\"]*)\"")
 
+DESCRIPTION_SHORT = "Export PCB 3D Models from KiCad to Blender"
 DESCRIPTION = re.sub(r"\n([^\n])", " \\g<1>", """
 The pcb2blender workflow lets you create professionally looking product renders of all your
 KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into
@@ -199,7 +273,7 @@ ORIGIN = "https://github.com/30350n/pcb2blender"
 METADATA = {
     "$schema": "https://go.kicad.org/pcm/schemas/v1",
     "name": "pcb2blender",
-    "description": "Export PCB 3D Models from Pcbnew to Blender",
+    "description": DESCRIPTION_SHORT,
     "description_full": DESCRIPTION,
     "identifier": "com.github.30350n.pcb2blender",
     "type": "plugin",
@@ -210,6 +284,38 @@ METADATA = {
         "homepage": ORIGIN,
     },
 }
+
+BLENDER_PYTHON = "3.11"
+
+SUPPORTED_PLATFORMS = {
+    "windows-amd64": ("win_amd64",),
+    "linux-x86_64": ("manylinux_2_28_x86_64", "manylinux_2_17_x86_64"),
+    "macos-x86_64": ("macosx_10_10_x86_64", "macosx_10_9_x86_64"),
+    "macos-arm64": ("macosx_11_0_arm64",),
+}
+
+MANIFEST = {
+    "schema_version": "1.0.0",
+    "id": "pcb2blender",
+    "version": None,
+    "name": "pcb2blender",
+    "tagline": DESCRIPTION_SHORT,
+    "maintainer": "30350n (Max Schlecht)",
+    "type": "add-on",
+    "permissions": ["files"],
+    "website": ORIGIN,
+    "tags": ["Import-Export"],
+    "blender_version_min": None,
+    "license": ["SPDX:GPL-3.0-or-later"],
+    "platforms": list(SUPPORTED_PLATFORMS.keys()),
+    "wheels": None,
+}
+
+extension_dependencies_regex = re.compile(r"deps\s*=\s*({[^}]*})")
+extension_init_patch = re.compile(
+    r"(add_dependencies(?:,\s+))|((?:,\s+)add_dependencies)|(add_dependencies(.*)\s)"
+    r"|(\sdeps\s*=\s*{[^}]*}\s)|(bl_info\s*=\s*{[^}]*}\s*)"
+)
 
 if __name__ == "__main__":
     skip_tests = "--skip-tests" in sys.argv
