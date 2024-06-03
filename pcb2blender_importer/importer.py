@@ -400,7 +400,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         if not (has_multiple_boards := bool(pcb.boards and self.cut_boards)):
             name = f"PCB_{filepath.stem}"
             pcb_object.name = pcb_object.data.name = name
-            add_smooth_by_angle_modifier(pcb_object)
             if self.enhance_materials and self.pcb_material == "RASTERIZED":
                 pcb_object.data.materials[0].name = name
 
@@ -420,7 +419,6 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             bpy.data.objects.remove(pcb_object)
             for name, board in pcb.boards.items():
                 board_obj = bpy.data.objects.new(f"PCB_{name}", pcb_mesh.copy())
-                add_smooth_by_angle_modifier(board_obj)
                 context.collection.objects.link(board_obj)
 
                 cut_material_index = len(board_obj.material_slots) + 1
@@ -521,6 +519,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 board_obj.location = offset
 
                 board.obj = board_obj
+
+        # fix smooth shading issues
+        bpy.ops.object.shade_smooth_by_angle(angle=radians(89), keep_sharp_edges=False)
 
         related_objects = []
 
