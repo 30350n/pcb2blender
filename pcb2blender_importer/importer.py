@@ -1041,6 +1041,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
     join:              BoolProperty(name="Join Shapes", default=True)
     tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
+    auto_smooth:       BoolProperty(name="Auto Smooth", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
     scale:             FloatProperty(name="Scale", default=FIX_X3D_SCALE, precision=5)
 
@@ -1061,7 +1062,8 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             obj.select_set(True)
         context.view_layer.objects.active = objects[0]
 
-        bpy.ops.object.shade_smooth()
+        if self.auto_smooth:
+            bpy.ops.object.shade_smooth()
 
         if self.join:
             meshes = {obj.data for obj in objects if obj.type == "MESH"}
@@ -1075,13 +1077,17 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             joined_obj = context.object
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
             joined_obj.data.name = joined_obj.name
-            add_smooth_by_angle_modifier(joined_obj)
             objects = [joined_obj]
+
+            if self.auto_smooth:
+                add_smooth_by_angle_modifier(joined_obj)
+
         else:
             bpy.ops.object.transform_apply(location=False, rotation=False)
-            for obj in objects:
-                if obj.type == "MESH":
-                    add_smooth_by_angle_modifier(obj)
+            if self.auto_smooth:
+                for obj in objects:
+                    if obj.type == "MESH":
+                        add_smooth_by_angle_modifier(obj)
 
         if self.tris_to_quads:
             bpy.ops.object.mode_set(mode="EDIT")
@@ -1108,6 +1114,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
         layout.prop(self, "join")
         layout.prop(self, "tris_to_quads")
+        layout.prop(self, "auto_smooth")
         layout.prop(self, "enhance_materials")
         layout.split()
         layout.prop(self, "scale")
