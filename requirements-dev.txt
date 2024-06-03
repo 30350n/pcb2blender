@@ -1,0 +1,10 @@
+autopep8
+gitpython
+pytest
+pytest-blender
+requests
+
+fake-bpy-module
+numpy
+pillow
+skia-python

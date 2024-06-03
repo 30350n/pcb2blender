@@ -5,4 +5,5 @@ site-packages/
 images/template*
 *.blend[1-9]
 env/
+.venv/
 release/
