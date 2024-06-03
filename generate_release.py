@@ -21,27 +21,30 @@ FILE_DIR = Path(__file__).parent
 KICAD_ADDON_DIR = FILE_DIR / "pcb2blender_exporter"
 BLENDER_ADDON_DIR = FILE_DIR / "pcb2blender_importer"
 
-def generate_release():
+def generate_release(skip_tests=False, ignore_git_issues=False):
     info("running autopep8 ...")
     autopep8(["", "--recursive", "--in-place", "."])
 
     repo = Repo()
-    if repo.is_dirty():
-        return error("repo is dirty (stash changes before generating a release)")
 
-    if repo.head.is_detached:
-        return error("repo is in detached head state")
-    if "up to date" not in repo.git.status():
-        return error("current commit is not pushed")
+    if not ignore_git_issues:
+        if repo.is_dirty():
+            return error("repo is dirty (stash changes before generating a release)")
+
+        if repo.head.is_detached:
+            return error("repo is in detached head state")
+        if "up to date" not in repo.git.status():
+            return error("current commit is not pushed")
 
     tags = list(reversed(sorted(repo.tags, key=lambda tag: tag.commit.committed_datetime)))
     if tags[0].commit != repo.commit():
         return error("current commit is not tagged")
 
-    with patch.object(sys, "argv", ["", "-q"]):
-        info("running pytest ...")
-        if (exit_code := pytest()) != 0:
-            return error(f"tests failed with {exit_code}")
+    if not skip_tests:
+        with patch.object(sys, "argv", ["", "-q"]):
+            info("running pytest ...")
+            if (exit_code := pytest()) != 0:
+                return error(f"tests failed with {exit_code}")
 
     info(f"generating release for {tags[0]} ... ")
 
@@ -209,4 +212,6 @@ METADATA = {
 }
 
 if __name__ == "__main__":
-    generate_release()
+    skip_tests = "--skip-tests" in sys.argv
+    ignore_git = "--ignore-git" in sys.argv
+    generate_release(skip_tests=skip_tests, ignore_git_issues=ignore_git)
