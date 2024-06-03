@@ -3,6 +3,7 @@ gitpython
 pytest
 pytest-blender
 requests
+snakeviz
 
 fake-bpy-module
 numpy

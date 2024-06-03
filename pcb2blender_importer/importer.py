@@ -1,4 +1,4 @@
-import io, random, re, shutil, struct, tempfile
+import io, random, re, shutil, struct, sys, tempfile
 from dataclasses import dataclass
 from enum import Enum
 from math import inf, radians
@@ -20,6 +20,13 @@ from mathutils import Matrix, Vector
 
 from .blender_addon_utils import ErrorHelper
 from .materials import *
+
+ENABLE_PROFILER = False
+if ENABLE_PROFILER:
+    from cProfile import Profile
+
+    def has_debugger_attached():
+        return sys.gettrace() is not None
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -200,6 +207,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
     def execute(self, context):
         filepath = Path(self.filepath)
 
+        if ENABLE_PROFILER and has_debugger_attached():
+            profiler = Profile()
+            profiler.enable()
+
         # import boards
 
         if (pcb := self.import_pcb3d(context, filepath)) == {"CANCELLED"}:
@@ -275,6 +286,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         if self.enhance_materials:
             enhance_materials(self.new_materials)
+
+        if ENABLE_PROFILER and has_debugger_attached():
+            profiler.disable()
+            profiler.dump_stats(
+                Path(__file__).parent.resolve() / Path(__file__).with_suffix(".prof").name
+            )
 
         return {"FINISHED"}
 

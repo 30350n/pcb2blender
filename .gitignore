@@ -7,3 +7,4 @@ images/template*
 env/
 .venv/
 release/
+*.prof
