@@ -48,7 +48,7 @@ def generate_release(skip_tests=False, ignore_git_issues=False):
 
     info(f"generating release for {tags[0]} ... ")
 
-    ARCHIVE_DIRECTORY.mkdir(exist_ok=True)
+    ARCHIVE_DIRECTORY.mkdir(parents=True, exist_ok=True)
     for path in RELEASE_DIRECTORY.glob("*.zip*"):
         if not path.is_file():
             continue

@@ -4,6 +4,7 @@ pytest
 pytest-blender
 requests
 snakeviz
+toml
 
 fake-bpy-module
 numpy
