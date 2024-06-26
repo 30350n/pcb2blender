@@ -309,7 +309,7 @@ svg_header_sub = "<svg\\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
 stackup_regex = re.compile(
     r"\(stackup\s*(?:\s*\([^\(\)]*(?:\([^\)]*\)\s*)*\)\s*)*\)", re.MULTILINE
 )
-stackup_thickness_regex = re.compile(r"\(thickness\s+([^\)]*)\s*\)")
+stackup_thickness_regex = re.compile(r"\(thickness\s+([^) ]*)[^)]*\)")
 stackup_mask_regex  = re.compile(
     r"\(layer\s+\"[FB].Mask\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
