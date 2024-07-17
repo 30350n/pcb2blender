@@ -259,7 +259,7 @@ def export_layers(board, bounds, output_directory: Path):
         plot_controller.PlotLayer()
         filepath = Path(plot_controller.GetPlotFileName())
         plot_controller.ClosePlot()
-        filepath = filepath.rename(filepath.parent / f"{layer}.svg")
+        filepath = filepath.replace(filepath.parent / f"{layer}.svg")
 
         content = filepath.read_text(encoding="utf-8")
         width  = f"{bounds[2]:.6f}mm"
