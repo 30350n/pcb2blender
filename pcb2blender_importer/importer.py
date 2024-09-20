@@ -6,6 +6,7 @@ from pathlib import Path
 from zipfile import BadZipFile, Path as ZipPath, ZipFile
 
 import numpy as np
+from error_helper import error, warning
 from PIL import Image, ImageOps
 from skia import SVGDOM, Color4f, Stream, Surface
 
@@ -18,7 +19,6 @@ from bpy.props import *
 from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
 from mathutils import Matrix, Vector
 
-from .blender_addon_utils import ErrorHelper
 from .materials import *
 
 ENABLE_PROFILER = False
@@ -159,6 +159,16 @@ class PCB3D:
     stackup: Stackup
     boards: dict[str, Board]
     pads: dict[str, Pad]
+
+class ErrorHelper:
+    def error(self, msg, prefix="error: "):
+        error(msg, prefix=prefix)
+        self.report({"ERROR"}, msg)
+        return {"CANCELLED"}
+
+    def warning(self, msg, prefix="warning: "):
+        warning(msg, prefix=prefix)
+        self.report({"WARNING"}, msg)
 
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper):
     """Import a PCB3D file"""

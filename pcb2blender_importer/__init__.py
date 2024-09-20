@@ -11,16 +11,23 @@ bl_info = {
     "tracker_url": "https://github.com/30350n/pcb2blender/issues",
 }
 
+import importlib
+
 __version__ = "2.12"
 
-from .blender_addon_utils import add_dependencies, register_modules_factory
+MODULE_NAMES = ("importer", "materials", "solder_joints")
+_modules = []
 
-deps = {
-    "numpy": "numpy",
-    "skia-python": "skia",
-    "pillow": "PIL",
-}
-add_dependencies(deps, no_extra_deps=True)
+def register():
+    for module_name in MODULE_NAMES:
+        if module_name in locals():
+            _modules.append(importlib.reload(locals()[module_name]))
+        else:
+            _modules.append(importlib.import_module(f".{module_name}", package=__package__))
 
-modules = ("importer", "materials", "solder_joints")
-register, unregister = register_modules_factory(modules)
+    for module in _modules:
+        module.register()
+
+def unregister():
+    for module in _modules:
+        module.unregister()
