@@ -1,4 +1,5 @@
 autopep8
+error-helper
 gitpython
 pytest
 pytest-blender

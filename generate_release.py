@@ -10,10 +10,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import requests, toml
 from autopep8 import main as autopep8
+from error_helper import *
 from git import Repo
 from pytest import main as pytest
-
-from _error_helper import *
 
 RELEASE_DIRECTORY = Path("release")
 ARCHIVE_DIRECTORY = RELEASE_DIRECTORY / "archive"
