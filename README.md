@@ -28,7 +28,7 @@ them, after last minute board revisions.
 
 - `Tools -> Plugin and Content Manager -> Plugins -> pcb2blender`
 
-- (manual) Download the `pcb2blender_exporter.zip` from the
+- (manual) Download the `pcb2blender_exporter_<version>.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),
   unpack the `plugins` directory from it into your
   [KiCad Plugin directory](https://dev-docs.kicad.org/en/apis-and-binding/pcbnew/) and rename it to
@@ -38,7 +38,7 @@ them, after last minute board revisions.
 
 - `Edit -> Preferences -> Get Extensions -> pcb2blender`
 
-- (manual) Download the `pcb2blender_importer.zip` from the
+- (manual) Download the `pcb2blender_importer_<version>.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),
   install it in Blender via<br>
   `Edit -> Preferences -> Add-ons -> Install`<br>

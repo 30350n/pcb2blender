@@ -20,7 +20,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install requests
-          NAME="pcb2blender_exporter_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $GITHUB_REF_NAME).zip"
+          NAME="pcb2blender_exporter_$(sed "s/-b.*//;s/-/_/;s/\./-/g" <<< $GITHUB_REF_NAME).zip"
           python .github/workflows/build_kicad_addon.py $GITHUB_REF_NAME \
             --source pcb2blender_exporter \
             --icon images/icon.png \
@@ -72,7 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NAME="pcb2blender_importer_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $GITHUB_REF_NAME).zip"
+          NAME="pcb2blender_importer_$(sed "s/-k.*-/_/;s/\./-/g" <<< $GITHUB_REF_NAME).zip"
           echo "extension_file="
           blender --command extension build \
             --source-dir pcb2blender_importer \
