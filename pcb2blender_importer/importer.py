@@ -1148,6 +1148,7 @@ class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform):
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
 
+# https://projects.blender.org/blender/blender/issues/117399
 def get_internal_asset_path():
     for path_type in ("LOCAL", "SYSTEM", "USER"):
         path = Path(bpy.utils.resource_path(path_type)) / "datafiles" / "assets"

@@ -55,7 +55,7 @@ def download_blender_extension_dependencies():
         f"./wheels/{filepath.name}"
         for filepath in BLENDER_ADDON_WHEEL_DIR.glob("*.whl")
     ]
-    BLENDER_ADDON_MANIFEST_TOML.write_text(tomlkit.dumps(blender_manifest))
+    BLENDER_ADDON_MANIFEST_TOML.write_text(tomlkit.dumps(blender_manifest), newline="\n")
 
 if __name__ == "__main__":
     download_blender_extension_dependencies()
