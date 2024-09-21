@@ -1,0 +1,35 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "pcb2blender",
+    "description": "Export PCB 3D Models from KiCad to Blender",
+    "description_full": "The pcb2blender workflow lets you create professionally looking product renders of all your KiCad projects in minutes! Simply export your board as a .pcb3d file in KiCad, import it into Blender and start creating!\n(Note for Linux/macOS users: If you run into any issues, make sure you're running python 3.10).\nIf you want to support this project, you can do so at https://github.com/sponsors/30350n",
+    "identifier": "com.github.30350n.pcb2blender",
+    "type": "plugin",
+    "author": {
+        "name": "Bobbe",
+        "contact": {
+            "web": "https://30350n.de/",
+            "github": "https://github.com/30350n",
+            "discord": "30350n"
+        }
+    },
+    "maintainer": {
+        "name": "Bobbe",
+        "contact": {
+            "web": "https://30350n.de/",
+            "github": "https://github.com/30350n",
+            "discord": "30350n"
+        }
+    },
+    "license": "GPL-3.0",
+    "resources": {
+        "homepage": "https://github.com/30350n/pcb2blender"
+    },
+    "versions": [
+        {
+            "version": "2.13",
+            "status": "stable",
+            "kicad_version": "8.0"
+        }
+    ]
+}

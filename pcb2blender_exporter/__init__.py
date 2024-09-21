@@ -5,8 +5,6 @@ import pcbnew, wx
 from .export import export_pcb3d, get_boarddefs
 from .ui import SettingsDialog
 
-__version__ = "2.12"
-
 class Pcb2BlenderExporter(pcbnew.ActionPlugin):
     def defaults(self):
         self.name = "Export to Blender (.pcb3d)"

@@ -6,19 +6,16 @@ from pathlib import Path
 from zipfile import BadZipFile, Path as ZipPath, ZipFile
 
 import numpy as np
+from error_helper import error, warning
 from PIL import Image, ImageOps
 from skia import SVGDOM, Color4f, Stream, Surface
 
 import addon_utils, bmesh, bpy
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
-from io_scene_x3d import (
-    ImportX3D, X3D_PT_import_transform, import_x3d,
-    menu_func_import as menu_func_import_x3d_original
-)
 from mathutils import Matrix, Vector
 
-from .blender_addon_utils import ErrorHelper
+from .io_scene_x3d.source import ImportX3D, X3D_PT_import_transform, import_x3d
 from .materials import *
 
 ENABLE_PROFILER = False
@@ -159,6 +156,16 @@ class PCB3D:
     stackup: Stackup
     boards: dict[str, Board]
     pads: dict[str, Pad]
+
+class ErrorHelper:
+    def error(self, msg, prefix="error: "):
+        error(msg, prefix=prefix)
+        self.report({"ERROR"}, msg)
+        return {"CANCELLED"}
+
+    def warning(self, msg, prefix="warning: "):
+        warning(msg, prefix=prefix)
+        self.report({"WARNING"}, msg)
 
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper):
     """Import a PCB3D file"""
@@ -1136,11 +1143,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         layout.split()
         layout.prop(self, "scale")
 
-bases = X3D_PT_import_transform.__bases__
-namespace = dict(X3D_PT_import_transform.__dict__)
-del namespace["bl_rna"]
-X3D_PT_import_transform_copy = type("X3D_PT_import_transform_copy", bases, namespace)
-class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform_copy):
+class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform):
     @classmethod
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
@@ -1177,7 +1180,7 @@ def menu_func_import_pcb3d(self, context):
 
 def menu_func_import_x3d(self, context):
     self.layout.operator(PCB2BLENDER_OT_import_x3d.bl_idname,
-        text="X3D Extensible 3D (.x3d/.wrl)")
+        text="X3D/VRML (.x3d/.wrl) (pcb2blender)")
 
 classes = (
     PCB2BLENDER_OT_import_pcb3d,
@@ -1189,16 +1192,12 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_x3d_original)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import_x3d)
-
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import_pcb3d)
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_pcb3d)
-
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_x3d)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import_x3d_original)
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

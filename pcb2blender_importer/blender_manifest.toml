@@ -1,0 +1,16 @@
+schema_version = "1.0.0"
+id = "pcb2blender_importer"
+version = "2.13.0-dev"
+name = "pcb2blender"
+tagline = "Import PCB 3D Models from KiCad"
+maintainer = "30350n (Max Schlecht)"
+type = "add-on"
+website = "https://github.com/30350n/pcb2blender"
+tags = ["Import-Export"]
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+platforms = ["windows-x64", "linux-x64", "macos-x64", "macos-arm64"]
+wheels = []
+
+[permissions]
+files = "Import .pcb3d files from disk"
