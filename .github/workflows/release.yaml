@@ -1,0 +1,77 @@
+name: Release
+on:
+  release:
+    types: [published]
+jobs:
+  build_pcb2blender_exporter:
+    name: Build pcb2blender_exporter KiCad Addon
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install Build Dependencies
+        run: pip install requests
+      - name: Build KiCad Addon
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install requests
+          NAME="pcb2blender_exporter_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $TAG_NAME).zip"
+          python .github/workflows/build_kicad_addon.py \
+            --source pcb2blender_exporter \
+            --icon images/icon.png \
+            --extra-files images/blender_icon_32x32.png
+          sha256sum $NAME | cut -c -64 > $NAME.sha256
+          gh release upload $TAG_NAME $NAME
+          gh release upload $TAG_NAME $NAME.sha256
+          gh release upload $TAG_NAME version.json
+      - name: Upload metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadata.json
+          path: metadata.json
+  build_pcb2blender_importer:
+    name: Build pcb2blender_importer Blender Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+      - name: Install Build Dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Set up Blender
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION=${TAG_NAME##*-b}
+          SNAP_CHANNEL=$(
+            snap info blender | grep -F "  $VERSION" | grep stable | head -n 1 | sed "s/: .*//"
+          )
+          sudo snap install blender --channel=$SNAP_CHANNEL --classic
+          curl https://bootstrap.pypa.io/get-pip.py -O
+          BLENDER_PYTHON=$(dirname "$(which blender)")/$VERSION/python/bin/python
+          sudo $BLENDER_PYTHON get-pip.py
+          sudo $BLENDER_PYTHON -m pip install pytest
+      - name: Run Tests
+        run: pytest -k test_importer
+      - name: Build Blender Extension
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NAME="pcb2blender_importer_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $TAG_NAME).zip"
+          echo "extension_file="
+          blender --command extension build \
+            --source-dir pcb2blender_importer \
+            --output-filepath $NAME
+          sha256sum $NAME | cut -c -64 > $NAME.sha256
+          gh release upload $TAG_NAME $NAME
+          gh release upload $TAG_NAME $NAME.sha256

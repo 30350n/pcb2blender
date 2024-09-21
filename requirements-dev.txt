@@ -1,11 +1,9 @@
-autopep8
 error-helper
-gitpython
 pytest
 pytest-blender
 requests
 snakeviz
-toml
+tomlkit
 
 fake-bpy-module
 numpy
