@@ -29,7 +29,7 @@ jobs:
           gh release upload $GITHUB_REF_NAME $NAME
           gh release upload $GITHUB_REF_NAME $NAME.sha256
           gh release upload $GITHUB_REF_NAME version.json
-      - name: Upload metadata artifact
+      - name: Create Content Library Metadata Artifact
         uses: actions/upload-artifact@v4
         with:
           name: KiCad Content Library Metadata
@@ -77,8 +77,7 @@ jobs:
           blender --command extension build \
             --source-dir pcb2blender_importer \
             --output-filepath $NAME
-          blender --command extension repo-add testing
-          blender --command extension install-file $NAME -r testing -e
+          blender --command extension install-file $NAME -r user_default -e
           sha256sum $NAME | cut -c -64 | tr -d "\n" > $NAME.sha256
           gh release upload $GITHUB_REF_NAME $NAME
           gh release upload $GITHUB_REF_NAME $NAME.sha256
