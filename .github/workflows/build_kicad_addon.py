@@ -19,8 +19,9 @@ def build_kicad_addon(
 ):
     metadata: dict = json.loads((path / "metadata.json").read_text())
 
-    version = metadata["versions"][0]["version"]
-    zip_file_path = output_path / f"{path.name}_{version.replace('.', '-')}.zip"
+    version_str = metadata["versions"][0]["version"].replace(".", "-")
+    kicad_version_str = metadata["versions"][0]["kicad_version"].replace(".", "-")
+    zip_file_path = output_path / f"{path.name}_v{version_str}_k{kicad_version_str}.zip"
     with ZipFile(zip_file_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
         plugin_dir = Path("plugins")
 
