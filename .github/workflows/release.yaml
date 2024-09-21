@@ -13,27 +13,26 @@ jobs:
           submodules: recursive
       - name: Set up Python
         uses: actions/setup-python@v5
-      - name: Install Build Dependencies
-        run: pip install requests
+        with:
+          python-version: "3.11"
       - name: Build KiCad Addon
         env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install requests
-          NAME="pcb2blender_exporter_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $TAG_NAME).zip"
-          python .github/workflows/build_kicad_addon.py \
+          NAME="pcb2blender_exporter_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $GITHUB_REF_NAME).zip"
+          python .github/workflows/build_kicad_addon.py $GITHUB_REF_NAME \
             --source pcb2blender_exporter \
             --icon images/icon.png \
             --extra-files images/blender_icon_32x32.png
-          sha256sum $NAME | cut -c -64 > $NAME.sha256
-          gh release upload $TAG_NAME $NAME
-          gh release upload $TAG_NAME $NAME.sha256
-          gh release upload $TAG_NAME version.json
+          sha256sum $NAME | cut -c -64 | tr -d "\n" > $NAME.sha256
+          gh release upload $GITHUB_REF_NAME $NAME
+          gh release upload $GITHUB_REF_NAME $NAME.sha256
+          gh release upload $GITHUB_REF_NAME version.json
       - name: Upload metadata artifact
         uses: actions/upload-artifact@v4
         with:
-          name: metadata.json
+          name: KiCad Content Library Metadata
           path: metadata.json
   build_pcb2blender_importer:
     name: Build pcb2blender_importer Blender Extension
@@ -47,31 +46,41 @@ jobs:
         uses: actions/setup-python@v5
       - name: Install Build Dependencies
         run: pip install -r requirements-dev.txt
+      - name: Update Extension Dependencies
+        run: python download_dependencies.py
       - name: Set up Blender
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          VERSION=${TAG_NAME##*-b}
           SNAP_CHANNEL=$(
-            snap info blender | grep -F "  $VERSION" | grep stable | head -n 1 | sed "s/: .*//"
+            snap info blender \
+              | grep -F "  ${GITHUB_REF_NAME##*-b}" | grep stable \
+              | head -n 1 | cut -c 3- | sed "s/: .*//"
           )
-          sudo snap install blender --channel=$SNAP_CHANNEL --classic
-          curl https://bootstrap.pypa.io/get-pip.py -O
-          BLENDER_PYTHON=$(dirname "$(which blender)")/$VERSION/python/bin/python
-          sudo $BLENDER_PYTHON get-pip.py
-          sudo $BLENDER_PYTHON -m pip install pytest
-      - name: Run Tests
-        run: pytest -k test_importer
-      - name: Build Blender Extension
+          SNAP_FILE=$(
+            snap download blender --channel=$SNAP_CHANNEL \
+              | tail -n 1 | sed "s/.* snap install //"
+          )
+          unsquashfs -q -n -dest blender-snap $SNAP_FILE
+          sudo snap try blender-snap --classic
+          curl https://bootstrap.pypa.io/get-pip.py -s -O
+      - name: Install Pytest in Blender
+        run: |
+          BLENDER_PYTHON_DIR="blender-snap/${GITHUB_REF_NAME##*-b}/python/bin"
+          BLENDER_PYTHON="$BLENDER_PYTHON_DIR/$(ls $BLENDER_PYTHON_DIR | sed "s/ .*//")"
+          $BLENDER_PYTHON get-pip.py
+          $BLENDER_PYTHON -m pip install pytest
+      - name: Build and Install Blender Extension
         env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NAME="pcb2blender_importer_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $TAG_NAME).zip"
+          NAME="pcb2blender_importer_$(sed "s/v//;s/-k.*//;s/\./-/" <<< $GITHUB_REF_NAME).zip"
           echo "extension_file="
           blender --command extension build \
             --source-dir pcb2blender_importer \
             --output-filepath $NAME
-          sha256sum $NAME | cut -c -64 > $NAME.sha256
-          gh release upload $TAG_NAME $NAME
-          gh release upload $TAG_NAME $NAME.sha256
+          blender --command extension repo-add testing
+          blender --command extension install-file $NAME -r testing -e
+          sha256sum $NAME | cut -c -64 | tr -d "\n" > $NAME.sha256
+          gh release upload $GITHUB_REF_NAME $NAME
+          gh release upload $GITHUB_REF_NAME $NAME.sha256
+      - name: Run Tests
+        run: pytest -k test_importer tests/
