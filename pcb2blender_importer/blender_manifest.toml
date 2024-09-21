@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "pcb2blender_importer"
-version = "2.13.0-dev"
+version = "2.13.0"
 name = "pcb2blender"
 tagline = "Import PCB 3D Models from KiCad"
 maintainer = "30350n (Max Schlecht)"
