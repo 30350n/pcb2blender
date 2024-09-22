@@ -41,8 +41,8 @@ them, after last minute board revisions.
 - (manual) Download the `pcb2blender_importer_<version>.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),
   install it in Blender via<br>
-  `Edit -> Preferences -> Add-ons -> Install`<br>
-  (you need to install the actual zip file, don't unpack it!) and enable it.
+  `Edit -> Preferences -> Add-ons -> Install from Disk... (Top Right Menu)`<br> and enable it.
+  (You need to install the actual zip file, don't unpack it!)
 
 ## Other Projects
 
