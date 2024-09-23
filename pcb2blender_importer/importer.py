@@ -218,6 +218,9 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             profiler = Profile()
             profiler.enable()
 
+        if context.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+
         # import boards
 
         if (pcb := self.import_pcb3d(context, filepath)) == {"CANCELLED"}:
