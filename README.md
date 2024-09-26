@@ -36,7 +36,7 @@ them, after last minute board revisions.
 
 ### Importer (Blender)
 
-- `Edit -> Preferences -> Get Extensions -> pcb2blender`
+- `Edit -> Preferences -> Get Extensions -> PCB 3D Importer`
 
 - (manual) Download the `pcb2blender_importer_<version>.zip` from the
   [latest release](https://github.com/30350n/pcb2blender/releases/latest),

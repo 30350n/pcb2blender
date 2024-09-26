@@ -1184,7 +1184,7 @@ def menu_func_import_pcb3d(self, context):
 
 def menu_func_import_x3d(self, context):
     self.layout.operator(PCB2BLENDER_OT_import_x3d.bl_idname,
-        text="X3D/VRML (.x3d/.wrl) (pcb2blender)")
+        text="X3D/VRML (.x3d/.wrl) (for pcb3d)")
 
 classes = (
     PCB2BLENDER_OT_import_pcb3d,
