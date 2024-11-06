@@ -30,7 +30,7 @@
             "version": "2.15",
             "status": "stable",
             "kicad_version": "8.0",
-            "kicad_version_max": "8.0",
+            "kicad_version_max": "8.0"
         }
     ]
 }
