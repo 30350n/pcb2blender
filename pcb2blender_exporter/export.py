@@ -214,7 +214,7 @@ def get_stackup(board):
     stackup = Stackup()
 
     tmp_path = get_temppath("pcb2blender_tmp.kicad_pcb")
-    board.Save(str(tmp_path))
+    pcbnew.SaveBoard(str(tmp_path), board, aSkipSettings=True)
     content = tmp_path.read_text(encoding="utf-8")
 
     if not (match := stackup_regex.search(content)):
