@@ -45,7 +45,7 @@ jobs:
         id: get-release-tag
         run: |
           RELEASE_TAG="${GITHUB_REF_NAME%%-b*}-b${{ matrix.blender-version }}"
-          echo "::set-output name=release-tag::$RELEASE_TAG"
+          echo "release-tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v4
         with:
