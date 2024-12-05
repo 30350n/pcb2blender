@@ -37,10 +37,19 @@ jobs:
   build_pcb2blender_importer:
     name: Build pcb2blender_importer Blender Extension
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        blender-version: ["4.2lts", "4.3"]
     steps:
+      - name: Get Release Tag
+        id: get-release-tag
+        run: |
+          RELEASE_TAG="${GITHUB_REF_NAME%%-b*}-b${{ matrix.blender-version }}"
+          echo "::set-output name=release-tag::$RELEASE_TAG"
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.get-release-tag.outputs.release-tag }}
           submodules: recursive
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -52,13 +61,8 @@ jobs:
         run: python download_dependencies.py
       - name: Set up Blender
         run: |
-          SNAP_CHANNEL=$(
-            snap info blender \
-              | grep -F "  ${GITHUB_REF_NAME##*-b}" | grep stable \
-              | head -n 1 | cut -c 3- | sed "s/: .*//"
-          )
           SNAP_FILE=$(
-            snap download blender --channel=$SNAP_CHANNEL \
+            snap download blender --channel=${{ matrix.blender-version }}/stable \
               | tail -n 1 | sed "s/.* snap install //"
           )
           unsquashfs -q -n -dest blender-snap $SNAP_FILE
@@ -66,15 +70,17 @@ jobs:
           curl https://bootstrap.pypa.io/get-pip.py -s -O
       - name: Install Pytest in Blender
         run: |
-          BLENDER_PYTHON_DIR="blender-snap/${GITHUB_REF_NAME##*-b}/python/bin"
+          BLENDER_VERSION=$(sed "s/[^0-9.]//g" <<< "${{ matrix.blender-version }}")
+          BLENDER_PYTHON_DIR="blender-snap/$BLENDER_VERSION/python/bin"
           BLENDER_PYTHON="$BLENDER_PYTHON_DIR/$(ls $BLENDER_PYTHON_DIR | sed "s/ .*//")"
           $BLENDER_PYTHON get-pip.py
           $BLENDER_PYTHON -m pip install pytest
       - name: Build and Install Blender Extension
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.get-release-tag.outputs.release-tag }}
         run: |
-          NAME="pcb2blender_importer_$(sed "s/-k.*-/_/;s/\./-/g" <<< $GITHUB_REF_NAME).zip"
+          NAME="pcb2blender_importer_$(sed "s/-k.*-/_/;s/\./-/g" <<< $RELEASE_TAG).zip"
           echo "extension_file="
           blender --command extension build \
             --source-dir pcb2blender_importer \
