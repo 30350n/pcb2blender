@@ -1077,7 +1077,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
         objects_before = set(bpy.data.objects)
         matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
-        result = import_x3d.load(context, self.filepath, global_matrix=matrix)
+        result = import_x3d.load(context, self.filepath, global_matrix=matrix, files=[])
         if not result == {"FINISHED"}:
             return result
 
