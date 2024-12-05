@@ -330,7 +330,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         objects_before = set(bpy.data.objects)
         bpy.ops.pcb2blender.import_x3d(
-            filepath=str(tempdir / PCB), scale=1.0, join=False, enhance_materials=False)
+            filepath=str(tempdir / PCB), global_scale=1.0, join=False, enhance_materials=False)
         pcb_objects = set(bpy.data.objects).difference(objects_before)
         pcb_objects = sorted(pcb_objects, key=lambda obj: obj.name)
 
@@ -1065,19 +1065,42 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
 
     filename_ext = ".x3d"
     filter_glob: StringProperty(default="*.x3d;*.wrl;*.wrz", options={"HIDDEN"})
+    file_unit: EnumProperty(
+        name="File Unit",
+        items=(
+            ("M", "Meter", ""),
+            ("DM", "Decimeter", ""),
+            ("CM", "Centimeter", ""),
+            ("MM", "Millimeter", ""),
+            ("IN", "Inch", ""),
+            ("CUSTOM", "CUSTOM", ""),
+        ),
+        description="Unit used in the input file",
+        default="CUSTOM",
+    )
+    global_scale: FloatProperty(
+        name="Scale",
+        soft_min=0.001, soft_max=1000.0,
+        default=FIX_X3D_SCALE,
+        precision=4,
+        step=1.0,
+        description="Scale value used when 'File Unit' is set to 'CUSTOM'",
+    )
 
     join:              BoolProperty(name="Join Shapes", default=True)
     tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
     auto_smooth:       BoolProperty(name="Auto Smooth", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-    scale:             FloatProperty(name="Scale", default=FIX_X3D_SCALE, precision=5)
 
     def execute(self, context):
         bpy.ops.object.select_all(action="DESELECT")
 
         objects_before = set(bpy.data.objects)
         matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
-        result = import_x3d.load(context, self.filepath, global_matrix=matrix, files=[])
+        result = import_x3d.load(
+            context, self.filepath, global_scale=self.global_scale, global_matrix=matrix,
+            files=[]
+        )
         if not result == {"FINISHED"}:
             return result
 
@@ -1085,7 +1108,6 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             return {"FINISHED"}
 
         for obj in objects:
-            obj.matrix_world = Matrix.Scale(self.scale, 4) @ obj.matrix_world
             obj.select_set(True)
         context.view_layer.objects.active = objects[0]
 
@@ -1145,8 +1167,6 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         layout.prop(self, "tris_to_quads")
         layout.prop(self, "auto_smooth")
         layout.prop(self, "enhance_materials")
-        layout.split()
-        layout.prop(self, "scale")
 
 class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform):
     @classmethod
