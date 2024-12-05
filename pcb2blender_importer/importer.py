@@ -1093,13 +1093,15 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
             bpy.ops.object.shade_smooth()
 
         if self.join:
-            meshes = {obj.data for obj in objects if obj.type == "MESH"}
+            for obj in objects.copy():
+                if obj.type != "MESH":
+                    bpy.data.objects.remove(obj)
+                    objects.remove(obj)
+            context.view_layer.objects.active = objects[0]
+
             if len(objects) > 1:
                 bpy.ops.object.join()
             bpy.ops.object.transform_apply()
-            for mesh in meshes:
-                if not mesh.users:
-                    bpy.data.meshes.remove(mesh)
 
             joined_obj = context.object
             joined_obj.name = Path(self.filepath).name.rsplit(".", 1)[0]
