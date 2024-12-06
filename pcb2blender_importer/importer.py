@@ -1077,6 +1077,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         ),
         description="Unit used in the input file",
         default="CUSTOM",
+        update=ImportX3D._file_unit_update,
     )
     global_scale: FloatProperty(
         name="Scale",
@@ -1099,7 +1100,6 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
         result = import_x3d.load(
             context, self.filepath, global_scale=self.global_scale, global_matrix=matrix,
-            files=[]
         )
         if not result == {"FINISHED"}:
             return result
