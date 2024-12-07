@@ -41,7 +41,7 @@ def merge_materials(meshes):
     merged_materials = {}
     for mesh in meshes:
         for i, material in enumerate(mesh.materials):
-            name = material.name.rsplit(".", 1)[0]
+            name = remove_blender_name_suffix(material.name)
             color = rgb2hex(material.diffuse_color)
             if merged_material := merged_materials.get((name, color)):
                 mesh.materials[i] = merged_material
@@ -55,9 +55,10 @@ def enhance_materials(materials):
             continue
         node_tree = material.node_tree
 
-        if mat4cad_mat := Material.from_name(material.name):
+        material_name = remove_blender_name_suffix(material.name)
+        if mat4cad_mat := Material.from_name(material_name):
             pass
-        elif mat4cad_mat := Material.from_name(KICAD_2_MAT4CAD.get(material.name, "")):
+        elif mat4cad_mat := Material.from_name(KICAD_2_MAT4CAD.get(material_name, "")):
             pass
         else:
             shader_nodes = (node for node in node_tree.nodes if node.type == "BSDF_PRINCIPLED")
@@ -72,6 +73,16 @@ def enhance_materials(materials):
             mat4cad_mat = Material.from_name(f"{base_material}-custom_{color_hex}-semi_matte")
 
         mat4cad_mat.setup_node_tree(node_tree)
+
+def remove_blender_name_suffix(name: str):
+    if name[-4] != ".":
+        return name
+
+    prefix, suffix = name.rsplit(".", 1)
+    if not suffix.isnumeric():
+        return name
+
+    return prefix
 
 def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], stackup):
     node_tree.nodes.clear()
