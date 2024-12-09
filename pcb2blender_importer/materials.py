@@ -75,7 +75,7 @@ def enhance_materials(materials):
         mat4cad_mat.setup_node_tree(node_tree)
 
 def remove_blender_name_suffix(name: str):
-    if name[-4] != ".":
+    if name[-4:-3] != ".":
         return name
 
     prefix, suffix = name.rsplit(".", 1)
