@@ -15,7 +15,7 @@ def build_kicad_addon(
     path: Path = Path(),
     output_path: Path = Path(),
     icon: Path | None = None,
-    extra_files: list[Path] = []
+    extra_files: list[Path] = [],
 ):
     metadata: dict = json.loads((path / "metadata.json").read_text())
 
