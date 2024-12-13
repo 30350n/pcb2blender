@@ -311,9 +311,9 @@ stackup_regex = re.compile(
 )
 stackup_thickness_regex = re.compile(r"\(thickness\s+([^) ]*)[^)]*\)")
 stackup_mask_regex  = re.compile(
-    r"\(layer\s+\"[FB].Mask\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+    r"\(layer\s+\"[FB].Mask\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
 stackup_silks_regex = re.compile(
-    r"\(layer\s+\"[FB].SilkS\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+    r"\(layer\s+\"[FB].SilkS\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
 stackup_copper_finish_regex = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")
