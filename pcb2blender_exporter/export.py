@@ -80,7 +80,7 @@ def export_pcb3d(filepath, boarddefs):
 
     wrl_path = get_temppath(PCB)
     components_path = get_temppath(COMPONENTS)
-    pcbnew.ExportVRML(wrl_path, 0.001, True, True, components_path, 0.0, 0.0)
+    pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(LAYERS)
     board = pcbnew.GetBoard()
