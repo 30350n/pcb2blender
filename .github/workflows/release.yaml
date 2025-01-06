@@ -25,6 +25,7 @@ jobs:
             --source pcb2blender_exporter \
             --icon images/icon.png \
             --extra-files images/blender_icon_32x32.png
+            --out pcb2blender_exporter/build
           sha256sum $NAME | cut -c -64 | tr -d "\n" > $NAME.sha256
           gh release upload $GITHUB_REF_NAME $NAME
           gh release upload $GITHUB_REF_NAME $NAME.sha256
