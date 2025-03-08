@@ -56,7 +56,7 @@ class PadType(Enum):
 
     @classmethod
     def _missing_(cls, value):
-        print(f"warning: unknown pad type '{value}'")
+        warning(f"unknown pad type '{value}'")
         return cls.UNKNOWN
 
 class PadShape(Enum):
@@ -71,7 +71,7 @@ class PadShape(Enum):
 
     @classmethod
     def _missing_(cls, value):
-        print(f"warning: unknown pad shape '{value}'")
+        warning(f"unknown pad shape '{value}'")
         return cls.UNKNOWN
 
 class DrillShape(Enum):
@@ -81,7 +81,7 @@ class DrillShape(Enum):
 
     @classmethod
     def _missing_(cls, value):
-        print(f"warning: unknown drill shape '{value}'")
+        warning(f"unknown drill shape '{value}'")
         return cls.UNKNOWN
 
 @dataclass
@@ -99,16 +99,23 @@ class Pad:
     drill_shape: DrillShape
     drill_size: Vector
 
-    @staticmethod
-    def from_bytes(data):
-        unpacked = struct.unpack("!ff????BBffffBff", data)
+    FORMAT = "!ff????BBffffBff"
+    FORMAT_SIZE = struct.calcsize(FORMAT)
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        if len(data) != cls.FORMAT_SIZE:
+            data = data[: cls.FORMAT_SIZE].ljust(cls.FORMAT_SIZE, b"\x00")
+            warning(f"unexpected pad data size '{len(data)}' (expected {cls.FORMAT_SIZE})")
+
+        unpacked = struct.unpack(cls.FORMAT, data)
         return Pad(
             Vector((unpacked[0], -unpacked[1])),
-            *unpacked[2:6],
+            *(unpacked[2], unpacked[3], unpacked[4], unpacked[5]),
             PadType(unpacked[6]),
             PadShape(unpacked[7]),
             Vector(unpacked[8:10]),
-            *unpacked[10:12],
+            *(unpacked[10], unpacked[11]),
             DrillShape(unpacked[12]),
             Vector(unpacked[13:15]),
         )
@@ -132,19 +139,27 @@ class SurfaceFinish(Enum):
 class Stackup:
     thickness_mm: float = 1.6
     mask_color: KiCadColor = KiCadColor.GREEN
-    mask_color_custom: tuple[float, float, float] = None
+    mask_color_custom: tuple[float, ...] = (0.0, 0.0, 0.0)
     silks_color: KiCadColor = KiCadColor.WHITE
-    silks_color_custom: tuple[float, float, float] = None
+    silks_color_custom: tuple[float, ...] = (0.0, 0.0, 0.0)
     surface_finish: SurfaceFinish = SurfaceFinish.HASL
 
-    def from_bytes(data):
-        unpacked = struct.unpack("!fbBBBbBBBb", data)
+    FORMAT = "!fbBBBbBBBb"
+    FORMAT_SIZE = struct.calcsize(FORMAT)
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        if len(data) != cls.FORMAT_SIZE:
+            data = data[: cls.FORMAT_SIZE].ljust(cls.FORMAT_SIZE, b"\x00")
+            warning(f"unexpected stackup data size '{len(data)}' (expected {cls.FORMAT_SIZE})")
+
+        unpacked = struct.unpack(cls.FORMAT, data)
         return Stackup(
             unpacked[0],
             KiCadColor(unpacked[1]),
-            tuple(Vector(unpacked[2:5]) / 255),
+            (Vector((unpacked[2], unpacked[3], unpacked[4])) / 255).to_tuple(),
             KiCadColor(unpacked[5]),
-            tuple(Vector(unpacked[6:9]) / 255),
+            (Vector((unpacked[6], unpacked[7], unpacked[8])) / 255).to_tuple(),
             SurfaceFinish(unpacked[9]),
         )
 
