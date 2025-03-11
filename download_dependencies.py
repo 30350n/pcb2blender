@@ -27,6 +27,16 @@ BLENDER_ADDON_SUPPORTED_PLATFORMS = {
     "macos-arm64": ("macosx_11_0_arm64",),
 }
 
+DOWNLOAD_BASE_COMMAND = (
+    "pip",
+    "download",
+    "--quiet",
+    *("--dest", BLENDER_ADDON_WHEEL_DIR),
+    *("--only-binary", ":all:"),
+    *("--python-version", BLENDER_PYTHON_VERSION),
+)
+
+
 def download_blender_extension_dependencies():
     if BLENDER_ADDON_WHEEL_DIR.is_dir():
         shutil.rmtree(BLENDER_ADDON_WHEEL_DIR)
@@ -36,11 +46,8 @@ def download_blender_extension_dependencies():
         for blender_platform, wheel_platforms in BLENDER_ADDON_SUPPORTED_PLATFORMS.items():
             for wheel_platform in wheel_platforms:
                 try:
-                    check_call((
-                        "pip", "download", dependency, f"--dest={BLENDER_ADDON_WHEEL_DIR}",
-                        "--only-binary=:all:", f"--python-version={BLENDER_PYTHON_VERSION}",
-                        f"--platform={wheel_platform}", "--quiet"
-                    ), stdout=DEVNULL, stderr=DEVNULL)
+                    command = DOWNLOAD_BASE_COMMAND + ("--platform", wheel_platform, dependency)
+                    check_call(command, stdout=DEVNULL, stderr=DEVNULL)
                     break
                 except CalledProcessError:
                     continue
@@ -52,10 +59,10 @@ def download_blender_extension_dependencies():
 
     blender_manifest = tomlkit.parse(BLENDER_ADDON_MANIFEST_TOML.read_text())
     blender_manifest["wheels"] = [
-        f"./wheels/{filepath.name}"
-        for filepath in BLENDER_ADDON_WHEEL_DIR.glob("*.whl")
+        f"./wheels/{filepath.name}" for filepath in BLENDER_ADDON_WHEEL_DIR.glob("*.whl")
     ]
     BLENDER_ADDON_MANIFEST_TOML.write_text(tomlkit.dumps(blender_manifest), newline="\n")
+
 
 if __name__ == "__main__":
     download_blender_extension_dependencies()

@@ -10,6 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import requests
 
+
 def build_kicad_addon(
     release_tag: str,
     path: Path = Path(),
@@ -50,9 +51,7 @@ def build_kicad_addon(
         version_metadata["download_size"] = sum(
             (info.compress_size for info in zip_file.infolist())
         )
-        version_metadata["install_size"] = sum(
-            (info.file_size for info in zip_file.infolist())
-        )
+        version_metadata["install_size"] = sum((info.file_size for info in zip_file.infolist()))
 
     content_library_metadata["versions"] = [version_metadata]
 
@@ -73,16 +72,17 @@ def build_kicad_addon(
     content_library_metadata_json = json.dumps(content_library_metadata, indent=4)
     (output_path / "metadata.json").write_text(content_library_metadata_json)
 
+
 def get_repo_url(path: Path):
     command = ("gh", "repo", "view", "--json", "url", "--template", "{{.url}}")
     return check_output(command, cwd=path).decode()
 
+
 def get_repo_tags(path: Path):
-    command = (
-        "gh", "release", "list", "--json", "tagName", "--template",
-        "{{range .}}{{.tagName}}{{\" \"}}{{end}}"
-    )
+    template = '{{range .}}{{.tagName}}{{" "}}{{end}}'
+    command = ("gh", "release", "list", "--json", "tagName", "--template", template)
     return check_output(command, cwd=path).decode().split()
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -91,8 +91,10 @@ if __name__ == "__main__":
     parser.add_argument("--out", default="", help="output directory")
     parser.add_argument("--icon", default="", help="path to addon icon (relative to SOURCE)")
     parser.add_argument(
-        "--extra-files", nargs="*", default=[],
-        help="path to extra addon files (relative to SOURCE)"
+        "--extra-files",
+        nargs="*",
+        default=[],
+        help="path to extra addon files (relative to SOURCE)",
     )
     args = parser.parse_args()
 
@@ -101,5 +103,5 @@ if __name__ == "__main__":
         Path(args.source),
         Path(args.out),
         Path(args.icon),
-        [Path(extra_file) for extra_file in args.extra_files]
+        [Path(extra_file) for extra_file in args.extra_files],
     )

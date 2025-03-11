@@ -1,4 +1,7 @@
-import re, shutil, struct, tempfile
+import re
+import shutil
+import struct
+import tempfile
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
@@ -18,16 +21,16 @@ BOUNDS = "bounds"
 STACKED = "stacked_"
 PADS = "pads"
 
-INCLUDED_LAYERS = (
-    "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
-)
+INCLUDED_LAYERS = ("F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask")
 
-SVG_MARGIN = 1.0 # mm
+SVG_MARGIN = 1.0  # mm
+
 
 @dataclass
 class StackedBoard:
     name: str
     offset: Tuple[float, float, float]
+
 
 @dataclass
 class BoardDef:
@@ -35,20 +38,23 @@ class BoardDef:
     bounds: Tuple[float, float, float, float]
     stacked_boards: List[StackedBoard] = field(default_factory=list)
 
+
 class KiCadColor(IntEnum):
     CUSTOM = 0
-    GREEN  = 1
-    RED    = 2
-    BLUE   = 3
+    GREEN = 1
+    RED = 2
+    BLUE = 3
     PURPLE = 4
-    BLACK  = 5
-    WHITE  = 6
+    BLACK = 5
+    WHITE = 6
     YELLOW = 7
+
 
 class SurfaceFinish(IntEnum):
     HASL = 0
     ENIG = 1
     NONE = 2
+
 
 SURFACE_FINISH_MAP = {
     "ENIG": SurfaceFinish.ENIG,
@@ -57,6 +63,7 @@ SURFACE_FINISH_MAP = {
     "HT_OSP": SurfaceFinish.NONE,
     "OSP": SurfaceFinish.NONE,
 }
+
 
 @dataclass
 class Stackup:
@@ -68,12 +75,16 @@ class Stackup:
     surface_finish: SurfaceFinish = SurfaceFinish.HASL
 
     def pack(self) -> bytes:
-        return struct.pack("!fbBBBbBBBb",
+        return struct.pack(
+            "!fbBBBbBBBb",
             self.thickness_mm,
-            self.mask_color, *self.mask_color_custom,
-            self.silks_color, *self.silks_color_custom,
+            self.mask_color,
+            *self.mask_color_custom,
+            self.silks_color,
+            *self.silks_color_custom,
             self.surface_finish,
         )
+
 
 def export_pcb3d(filepath, boarddefs):
     init_tempdir()
@@ -86,7 +97,8 @@ def export_pcb3d(filepath, boarddefs):
     board = pcbnew.GetBoard()
     box = board.ComputeBoundingBox(aBoardEdgesOnly=True)
     bounds = (
-        ToMM(box.GetLeft()) - SVG_MARGIN, ToMM(box.GetTop()) - SVG_MARGIN,
+        ToMM(box.GetLeft()) - SVG_MARGIN,
+        ToMM(box.GetTop()) - SVG_MARGIN,
         ToMM(box.GetRight() - box.GetLeft()) + SVG_MARGIN * 2,
         ToMM(box.GetBottom() - box.GetTop()) + SVG_MARGIN * 2,
     )
@@ -113,14 +125,14 @@ def export_pcb3d(filepath, boarddefs):
 
             for stacked in boarddef.stacked_boards:
                 file.writestr(
-                    f"{subdir}/{STACKED}{stacked.name}",
-                    struct.pack("!fff", *stacked.offset)
+                    f"{subdir}/{STACKED}{stacked.name}", struct.pack("!fff", *stacked.offset)
                 )
 
         for i, footprint in enumerate(board.Footprints()):
             has_model = len(footprint.Models()) > 0
             is_tht_or_smd = bool(
-                footprint.GetAttributes() & (pcbnew.FP_THROUGH_HOLE | pcbnew.FP_SMD))
+                footprint.GetAttributes() & (pcbnew.FP_THROUGH_HOLE | pcbnew.FP_SMD)
+            )
             value = footprint.GetValue()
             reference = footprint.GetReference()
             for j, pad in enumerate(footprint.Pads()):
@@ -143,6 +155,7 @@ def export_pcb3d(filepath, boarddefs):
                     *map(ToMM, pad.GetDrillSize()),
                 )
                 file.writestr(f"{PADS}/{name}", data)
+
 
 def get_boarddefs(board):
     boarddefs = {}
@@ -178,7 +191,7 @@ def get_boarddefs(board):
 
             boarddef = BoardDef(
                 sanitized(name),
-                (tl_pos[0], tl_pos[1], br_pos[0] - tl_pos[0], br_pos[1] - tl_pos[1])
+                (tl_pos[0], tl_pos[1], br_pos[0] - tl_pos[0], br_pos[1] - tl_pos[1]),
             )
             boarddefs[boarddef.name] = boarddef
 
@@ -201,14 +214,14 @@ def get_boarddefs(board):
         stack_pos = stacks.pop(stack_str)
         target_pos = boarddefs[target_name].bounds[:2]
         stacked = StackedBoard(
-            other_name,
-            (stack_pos[0] - target_pos[0], stack_pos[1] - target_pos[1], z_offset)
+            other_name, (stack_pos[0] - target_pos[0], stack_pos[1] - target_pos[1], z_offset)
         )
         boarddefs[target_name].stacked_boards.append(stacked)
 
     ignored += list(tls.keys()) + list(brs.keys()) + list(stacks.keys())
 
     return boarddefs, ignored
+
 
 def get_stackup(board):
     stackup = Stackup()
@@ -217,29 +230,31 @@ def get_stackup(board):
     pcbnew.SaveBoard(str(tmp_path), board, aSkipSettings=True)
     content = tmp_path.read_text(encoding="utf-8")
 
-    if not (match := stackup_regex.search(content)):
+    if not (match := STACKUP_REGEX.search(content)):
         return stackup
     stackup_content = match.group(0)
 
-    if matches := stackup_thickness_regex.finditer(stackup_content):
+    if matches := STACKUP_THICKNESS_REGEX.finditer(stackup_content):
         stackup.thickness_mm = sum(float(match.group(1)) for match in matches)
 
-    if match := stackup_mask_regex.search(stackup_content):
+    if match := STACKUP_MASK_REGEX.search(stackup_content):
         stackup.mask_color, stackup.mask_color_custom = parse_kicad_color(match.group(1))
 
-    if match := stackup_silks_regex.search(stackup_content):
+    if match := STACKUP_SILKS_REGEX.search(stackup_content):
         stackup.silks_color, stackup.silks_color_custom = parse_kicad_color(match.group(1))
 
-    if match := stackup_copper_finish_regex.search(stackup_content):
+    if match := STACKUP_COPPER_FINISH_REGEX.search(stackup_content):
         stackup.surface_finish = SURFACE_FINISH_MAP.get(match.group(1), SurfaceFinish.HASL)
 
     return stackup
+
 
 def parse_kicad_color(string):
     if string[0] == "#":
         return KiCadColor.CUSTOM, hex2rgb(string[1:7])
     else:
         return KiCadColor[string.upper()], (0, 0, 0)
+
 
 def export_layers(board, bounds, output_directory: Path):
     plot_controller = PLOT_CONTROLLER(board)
@@ -262,20 +277,24 @@ def export_layers(board, bounds, output_directory: Path):
         filepath = filepath.replace(filepath.parent / f"{layer}.svg")
 
         content = filepath.read_text(encoding="utf-8")
-        width  = f"{bounds[2]:.6f}mm"
+        width = f"{bounds[2]:.6f}mm"
         height = f"{bounds[3]:.6f}mm"
         viewBox = " ".join(f"{value:.6f}" for value in bounds)
-        content = svg_header_regex.sub(svg_header_sub.format(width, height, viewBox), content)
+        content = SVG_HEADER_REGEX.sub(SVG_HEADER_SUB.format(width, height, viewBox), content)
         filepath.write_text(content, encoding="utf-8")
+
 
 def sanitized(name):
     return re.sub(r"[\W]+", "_", name)
 
+
 def get_tempdir():
     return Path(tempfile.gettempdir()) / "pcb2blender_tmp"
 
+
 def get_temppath(filename):
     return get_tempdir() / filename
+
 
 def init_tempdir():
     tempdir = get_tempdir()
@@ -294,6 +313,7 @@ def init_tempdir():
                 return
     tempdir.mkdir()
 
+
 def hex2rgb(hex_string):
     return (
         int(hex_string[0:2], 16),
@@ -301,19 +321,18 @@ def hex2rgb(hex_string):
         int(hex_string[4:6], 16),
     )
 
-svg_header_regex = re.compile(
+
+SVG_HEADER_REGEX = re.compile(
     r"<svg([^>]*)width=\"[^\"]*\"[^>]*height=\"[^\"]*\"[^>]*viewBox=\"[^\"]*\"[^>]*>"
 )
-svg_header_sub = "<svg\\g<1>width=\"{}\" height=\"{}\" viewBox=\"{}\">"
+SVG_HEADER_SUB = '<svg\\g<1>width="{}" height="{}" viewBox="{}">'
 
-stackup_regex = re.compile(
-    r"\(stackup\s*(?:\s*\([^\(\)]*(?:\([^\)]*\)\s*)*\)\s*)*\)", re.MULTILINE
-)
-stackup_thickness_regex = re.compile(r"\(thickness\s+([^) ]*)[^)]*\)")
-stackup_mask_regex  = re.compile(
+STACKUP_REGEX = re.compile(r"\(stackup\s*(?:\s*\([^\(\)]*(?:\([^\)]*\)\s*)*\)\s*)*\)", re.MULTILINE)
+STACKUP_THICKNESS_REGEX = re.compile(r"\(thickness\s+([^) ]*)[^)]*\)")
+STACKUP_MASK_REGEX = re.compile(
     r"\(layer\s+\"[FB].Mask\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
-stackup_silks_regex = re.compile(
+STACKUP_SILKS_REGEX = re.compile(
     r"\(layer\s+\"[FB].SilkS\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
-stackup_copper_finish_regex = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")
+STACKUP_COPPER_FINISH_REGEX = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")

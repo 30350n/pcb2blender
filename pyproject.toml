@@ -1,21 +1,41 @@
-[tool.autopep8]
-aggressive = 3
-max_line_length = 96
-ignore = "E12,E13,E201,E202,E221,E241,E261,E302,E305,E401,E402"
-exclude = "site-packages"
+[project]
+name = "pcb2blender"
+version = "2.17.0"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = ["error-helper==1.4", "pillow==11.1.0", "skia-python==87.6"]
+license = "GPL-3.0-or-later"
 
-[tool.isort]
-line_length = 96
-lines_after_imports = 1
-combine_as_imports = true
-combine_straight_imports = true
-multi_line_output = 5
-known_blender = ["addon_utils", "bpy", "bpy_extras", "bl_ui", "bmesh", "mathutils"]
-known_pcbnew = ["pcbnew", "wx"]
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "BLENDER", "PCBNEW", "FIRSTPARTY", "LOCALFOLDER"]
+[dependency-groups]
+dev = [
+    "fake-bpy-module",
+    "numpy",
+    "pip",
+    "pytest",
+    "pytest-blender",
+    "requests",
+    "snakeviz",
+    "tomlkit",
+]
 
-[tool.pytest.ini_options]
-addopts = "--ignore-glob=*site-packages*"
+[tool.ruff]
+line-length = 100
 
-[tool.codespell]
-ignore-words-list = "tht"
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "blender",
+    "pcbnew",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+blender = ["addon_utils", "bpy", "bpy_extras", "bl_ui", "bmesh", "mathutils", "numpy"]
+pcbnew = ["pcbnew", "wx"]

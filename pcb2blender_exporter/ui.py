@@ -2,6 +2,7 @@ from pathlib import Path
 
 import wx
 
+
 class SettingsDialog(wx.Dialog):
     def __init__(self, parent, boarddefs, ignored):
         wx.Dialog.__init__(self, parent, title="Export to Blender")
@@ -21,8 +22,9 @@ class SettingsDialog(wx.Dialog):
             self.EndModal(wx.OK)
         else:
             wx.MessageBox(
-                f"Invalid path \"{path.parent}\"!", caption="Error",
-                style=wx.CENTER | wx.ICON_ERROR | wx.OK
+                f"Invalid path '{path.parent}'!",
+                caption="Error",
+                style=wx.CENTER | wx.ICON_ERROR | wx.OK,
             )
 
     def init_panel(self, boarddefs, ignored):
@@ -36,10 +38,11 @@ class SettingsDialog(wx.Dialog):
         column.Add(text_export_as, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
         self.file_picker = wx.FilePickerCtrl(
-            panel, message="Export as",
+            panel,
+            message="Export as",
             wildcard="PCB 3D Model (.pcb3d)|*.pcb3d",
             style=wx.FLP_SAVE | wx.FLP_USE_TEXTCTRL | wx.FLP_OVERWRITE_PROMPT,
-            size=(300, 25)
+            size=(300, 25),
         )
         column.Add(self.file_picker, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
@@ -54,8 +57,7 @@ class SettingsDialog(wx.Dialog):
         info.Add(text_detected, flag=wx.ALL, border=5)
 
         for name, boarddef in sorted(boarddefs.items()):
-            label = f"PCB {name}"\
-                f" ({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
+            label = f"PCB {name} ({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
             if boarddef.stacked_boards:
                 label += " with "
                 for stacked in boarddef.stacked_boards:
@@ -71,7 +73,7 @@ class SettingsDialog(wx.Dialog):
         if ignored:
             warning = wx.StaticBoxSizer(
                 wx.StaticBox(panel, label="Warning (failed to parse some identifiers)"),
-                orient=wx.VERTICAL
+                orient=wx.VERTICAL,
             )
 
             for name in ignored:
@@ -80,15 +82,16 @@ class SettingsDialog(wx.Dialog):
             rows.Add(warning, flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         hint = wx.StaticBoxSizer(wx.StaticBox(panel, label="Hint"), orient=wx.VERTICAL)
-        boarddef_hint = ""\
-            "To define a board, specify its bounds by placing a Text Item with the text "\
-            "PCB3D_TL_<boardname> at its top left corner and one with "\
-            "PCB3D_BR_<boardname> at its bottom right corner.\n\n"\
-            "To stack a board A to another board B, add a Text Item with the text "\
-            "PCB3D_STACK_<boardA>_ONTO_<boardB>_<zoffset>\n"\
-            "at the location (relative to the top left corner of board B), "\
-            "where you want the top left corner of A to be.\n"\
+        boarddef_hint = (
+            "To define a board, specify its bounds by placing a Text Item with the text "
+            "PCB3D_TL_<boardname> at its top left corner and one with "
+            "PCB3D_BR_<boardname> at its bottom right corner.\n\n"
+            "To stack a board A to another board B, add a Text Item with the text "
+            "PCB3D_STACK_<boardA>_ONTO_<boardB>_<zoffset>\n"
+            "at the location (relative to the top left corner of board B), "
+            "where you want the top left corner of A to be.\n"
             "(zoffset is given in mm, 10.0 is a good default for 2.54mm headers and sockets)"
+        )
         boarddef_hint_text = wx.StaticText(panel, label=boarddef_hint)
         boarddef_hint_text.Wrap(400)
         hint.Add(boarddef_hint_text, flag=wx.ALL, border=5)

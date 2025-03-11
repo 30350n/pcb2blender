@@ -3,6 +3,7 @@ import importlib
 MODULE_NAMES = ("importer", "materials", "solder_joints")
 _modules = []
 
+
 def register():
     _modules.clear()
     for module_name in MODULE_NAMES:
@@ -13,6 +14,7 @@ def register():
 
     for module in _modules:
         module.register()
+
 
 def unregister():
     for module in _modules:

@@ -1,16 +1,24 @@
-import io, random, re, shutil, struct, sys, tempfile
+import io
+import random
+import re
+import shutil
+import struct
+import sys
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from math import inf, radians
 from pathlib import Path
 from zipfile import BadZipFile, Path as ZipPath, ZipFile
 
-import numpy as np
 from error_helper import error, warning
 from PIL import Image, ImageOps
 from skia import SVGDOM, Color4f, Stream, Surface
 
-import addon_utils, bmesh, bpy
+import addon_utils
+import bmesh
+import bpy
+import numpy as np
 from bpy.props import *
 from bpy_extras.io_utils import ImportHelper, axis_conversion, orientation_helper
 from mathutils import Matrix, Vector
@@ -25,6 +33,7 @@ if ENABLE_PROFILER:
     def has_debugger_attached():
         return sys.gettrace() is not None
 
+
 PCB = "pcb.wrl"
 COMPONENTS = "components"
 LAYERS = "layers"
@@ -35,17 +44,17 @@ BOUNDS = "bounds"
 STACKED = "stacked_"
 PADS = "pads"
 
-INCLUDED_LAYERS = (
-    "F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask"
-)
+INCLUDED_LAYERS = ("F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask")
 
 REQUIRED_MEMBERS = {PCB, LAYERS}
+
 
 @dataclass
 class Board:
     bounds: tuple[Vector, Vector]
     stacked_boards: list[tuple[str, Vector]]
     obj: bpy.types.Object = None
+
 
 class PadType(Enum):
     UNKNOWN = -1
@@ -58,6 +67,7 @@ class PadType(Enum):
     def _missing_(cls, value):
         warning(f"unknown pad type '{value}'")
         return cls.UNKNOWN
+
 
 class PadShape(Enum):
     UNKNOWN = -1
@@ -74,6 +84,7 @@ class PadShape(Enum):
         warning(f"unknown pad shape '{value}'")
         return cls.UNKNOWN
 
+
 class DrillShape(Enum):
     UNKNOWN = -1
     CIRCULAR = 0
@@ -83,6 +94,7 @@ class DrillShape(Enum):
     def _missing_(cls, value):
         warning(f"unknown drill shape '{value}'")
         return cls.UNKNOWN
+
 
 @dataclass
 class Pad:
@@ -120,20 +132,23 @@ class Pad:
             Vector(unpacked[13:15]),
         )
 
+
 class KiCadColor(Enum):
     CUSTOM = 0
-    GREEN  = 1
-    RED    = 2
-    BLUE   = 3
+    GREEN = 1
+    RED = 2
+    BLUE = 3
     PURPLE = 4
-    BLACK  = 5
-    WHITE  = 6
+    BLACK = 5
+    WHITE = 6
     YELLOW = 7
+
 
 class SurfaceFinish(Enum):
     HASL = 0
     ENIG = 1
     NONE = 2
+
 
 @dataclass
 class Stackup:
@@ -163,6 +178,7 @@ class Stackup:
             SurfaceFinish(unpacked[9]),
         )
 
+
 @dataclass
 class PCB3D:
     content: str
@@ -171,6 +187,7 @@ class PCB3D:
     stackup: Stackup
     boards: dict[str, Board]
     pads: dict[str, Pad]
+
 
 class ErrorHelper:
     def error(self, msg, prefix="error: "):
@@ -182,43 +199,59 @@ class ErrorHelper:
         warning(msg, prefix=prefix)
         self.report({"WARNING"}, msg)
 
+
 class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper):
     """Import a PCB3D file"""
+
     bl_idname = "pcb2blender.import_pcb3d"
     bl_label = "Import .pcb3d"
     bl_options = {"PRESET", "UNDO"}
 
     import_components: BoolProperty(name="Import Components", default=True)
-    add_solder_joints: EnumProperty(name="Add Solder Joints", default="SMART",
+    add_solder_joints: EnumProperty(
+        name="Add Solder Joints",
+        default="SMART",
         items=(
             ("NONE", "None", "Do not add any solder joints"),
-            ("SMART", "Smart", "Only add solder joints to footprints that have THT/SMD "
-                "attributes set and that have 3D models and only to pads which have a "
-                "solder paste layer (for SMD pads)"),
-            ("ALL", "All", "Add solder joints to all pads")))
+            (
+                "SMART",
+                "Smart",
+                "Only add solder joints to footprints that have THT/SMD attributes set and that "
+                "have 3D models and only to pads which have a solder paste layer (for SMD pads)",
+            ),
+            ("ALL", "All", "Add solder joints to all pads"),
+        ),
+    )
 
-    center_boards:     BoolProperty(name="Center PCBs", default=True)
-    cut_boards:        BoolProperty(name="Cut PCBs", default=True)
-    stack_boards:      BoolProperty(name="Stack PCBs", default=True)
+    center_boards: BoolProperty(name="Center PCBs", default=True)
+    cut_boards: BoolProperty(name="Cut PCBs", default=True)
+    stack_boards: BoolProperty(name="Stack PCBs", default=True)
 
-    merge_materials:   BoolProperty(name="Merge Materials", default=True)
+    merge_materials: BoolProperty(name="Merge Materials", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
-    pcb_material:      EnumProperty(name="PCB Material", default="RASTERIZED",
-        items=(("RASTERIZED", "Rasterized (Cycles)", ""), ("3D", "3D (deprecated)", "")))
-    texture_dpi:       FloatProperty(name="Texture DPI",
-        default=1016.0, min=0.0, soft_min=508.0, soft_max=2032.0)
+    pcb_material: EnumProperty(
+        name="PCB Material",
+        default="RASTERIZED",
+        items=(
+            ("RASTERIZED", "Rasterized (Cycles)", ""),
+            ("3D", "3D (deprecated)", ""),
+        ),
+    )
+    texture_dpi: FloatProperty(
+        name="Texture DPI", default=1016.0, min=0.0, soft_min=508.0, soft_max=2032.0
+    )
 
-    import_fpnl:       BoolProperty(name="Import Frontpanel (.fpnl)", default=True,
-        description="Import the specified .fpnl file and align it (if its stacked to a pcb).")
-    fpnl_path:         StringProperty(name="", subtype="FILE_PATH",
-        description="")
-    fpnl_thickness:    FloatProperty(name="Panel Thickness (mm)",
-        default=2.0, min=0.0, soft_max=5.0)
-    fpnl_bevel_depth:  FloatProperty(name="Bevel Depth (mm)",
-        default=0.05, min=0.0, soft_max=0.25)
+    import_fpnl: BoolProperty(
+        name="Import Frontpanel (.fpnl)",
+        default=True,
+        description="Import the specified .fpnl file and align it (if its stacked to a pcb).",
+    )
+    fpnl_path: StringProperty(name="", subtype="FILE_PATH", description="")
+    fpnl_thickness: FloatProperty(name="Panel Thickness (mm)", default=2.0, min=0.0, soft_max=5.0)
+    fpnl_bevel_depth: FloatProperty(name="Bevel Depth (mm)", default=0.05, min=0.0, soft_max=0.25)
     fpnl_setup_camera: BoolProperty(name="Setup Orthographic Camera", default=True)
 
-    filter_glob:       StringProperty(default="*.pcb3d", options={"HIDDEN"})
+    filter_glob: StringProperty(default="*.pcb3d", options={"HIDDEN"})
 
     def __init__(self):
         self.last_fpnl_path = ""
@@ -249,24 +282,25 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     filepath=self.fpnl_path,
                     thickness=self.fpnl_thickness,
                     bevel_depth=self.fpnl_bevel_depth,
-                    setup_camera=self.fpnl_setup_camera
+                    setup_camera=self.fpnl_setup_camera,
                 )
                 pcb.boards["FPNL"] = Board((Vector(), Vector()), [], context.object)
             else:
-                self.warning(f"frontpanel file \"{filepath}\" does not exist")
+                self.warning(f'frontpanel file "{filepath}" does not exist')
 
         # stack boards
 
         if self.stack_boards:
             for board in pcb.boards.values():
-                for (name, offset) in board.stacked_boards:
+                for name, offset in board.stacked_boards:
                     if name not in pcb.boards:
-                        self.warning(f"ignoring stacked board \"{name}\" (unknown board)")
+                        self.warning(f'ignoring stacked board "{name}" (unknown board)')
                         continue
 
                     if not pcb.boards[name].obj:
                         self.warning(
-                            f"ignoring stacked board \"{name}\" (cut_boards is set to False)")
+                            f'ignoring stacked board "{name}" (cut_boards is set to False)'
+                        )
                         continue
 
                     stacked_obj = pcb.boards[name].obj
@@ -322,7 +356,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
     def import_pcb3d(self, context, filepath):
         if not filepath.is_file():
-            return self.error(f"file \"{filepath}\" does not exist")
+            return self.error(f'file "{filepath}" does not exist')
 
         dirname = filepath.name.replace(".", "_") + f"_{random.getrandbits(64)}"
         tempdir = Path(tempfile.gettempdir()) / "pcb2blender_tmp" / dirname
@@ -345,7 +379,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         objects_before = set(bpy.data.objects)
         bpy.ops.pcb2blender.import_x3d(
-            filepath=str(tempdir / PCB), global_scale=1.0, join=False, enhance_materials=False)
+            filepath=str(tempdir / PCB), global_scale=1.0, join=False, enhance_materials=False
+        )
         pcb_objects = set(bpy.data.objects).difference(objects_before)
         pcb_objects = sorted(pcb_objects, key=lambda obj: obj.name)
 
@@ -362,11 +397,11 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             images = {}
             for f_layer, b_layer in zip(INCLUDED_LAYERS[0::2], INCLUDED_LAYERS[1::2]):
                 front = self.svg2img(layers_path / f"{f_layer}.svg", dpi).getchannel(0)
-                back  = self.svg2img(layers_path / f"{b_layer}.svg", dpi).getchannel(0)
+                back = self.svg2img(layers_path / f"{b_layer}.svg", dpi).getchannel(0)
 
                 if (layer := f_layer[2:]) != "Mask":
                     front = ImageOps.invert(front)
-                    back  = ImageOps.invert(back)
+                    back = ImageOps.invert(back)
                     empty = Image.new("L", front.size)
 
                 png_path = layers_path / f"{filepath.stem}_{layer}.png"
@@ -385,7 +420,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
         if self.import_components:
             for component in pcb.components:
                 bpy.ops.pcb2blender.import_x3d(
-                    filepath=str(tempdir / component), enhance_materials=False)
+                    filepath=str(tempdir / component), enhance_materials=False
+                )
                 obj = context.object
                 obj.data.name = component.rsplit("/", 1)[1].rsplit(".", 1)[0]
                 self.component_cache[component] = obj.data
@@ -496,7 +532,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 dissolve_verts = board_edge_verts - keep_verts
 
                 merge_distance = pcb.stackup.thickness_mm * MM_TO_M * 0.5
-                merge_distance_sq = merge_distance ** 2
+                merge_distance_sq = merge_distance**2
 
                 # TODO: doing this separately for top/bottom verts could improve performance
 
@@ -614,8 +650,10 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     case PadShape.ROUNDRECT:
                         roundness = pad.roundness * 2.0
                     case PadShape.TRAPEZOID | PadShape.CHAMFERED_RECT | PadShape.CUSTOM:
-                        print(f"skipping solder joint for '{pad_name}', "
-                              f"unsupported shape '{pad.shape.name}'")
+                        print(
+                            f"skipping solder joint for '{pad_name}', "
+                            f"unsupported shape '{pad.shape.name}'"
+                        )
                         continue
 
                 cache_id = (pad_type, tuple(pad_size), hole_shape, tuple(hole_size), roundness)
@@ -669,8 +707,8 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
                     name, parent_board = closest
                     self.warning(
-                        f"assigning \"{obj.name}\" (out of bounds) "
-                        f"to closest board \"{name}\"")
+                        f'assigning "{obj.name}" (out of bounds) to closest board "{name}"'
+                    )
 
                 obj.location.xy -= parent_board.bounds[0] * MM_TO_M
                 obj.parent = parent_board.obj
@@ -686,10 +724,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 filtered = regex_filter_components.sub("\\g<prefix>", pcb_file_content)
                 filtered_file.write(filtered.encode("utf-8"))
 
-        components = list({
-            name for name in file.namelist()
+        components = {
+            name
+            for name in file.namelist()
             if name.startswith(f"{COMPONENTS}/") and name.endswith(".wrl")
-        })
+        }
+
         file.extractall(extract_dir, components)
 
         layers = (f"{LAYERS}/{layer}.svg" for layer in INCLUDED_LAYERS)
@@ -706,7 +746,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
 
         boards = {}
         if not (boards_path := (zip_path / BOARDS)).exists():
-            self.warning(f"old file format: PCB3D file doesn't contain \"{BOARDS}\" dir")
+            self.warning(f'old file format: PCB3D file doesn\'t contain "{BOARDS}" dir')
         else:
             for board_dir in boards_path.iterdir():
                 bounds_path = board_dir / BOUNDS
@@ -716,12 +756,12 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                 try:
                     bounds = struct.unpack("!ffff", bounds_path.read_bytes())
                 except struct.error:
-                    self.warning(f"ignoring board \"{board_dir}\" (corrupted)")
+                    self.warning(f'ignoring board "{board_dir}" (corrupted)')
                     continue
 
                 bounds = (
                     Vector((bounds[0], -bounds[1])),
-                    Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3])))
+                    Vector((bounds[0] + bounds[2], -(bounds[1] + bounds[3]))),
                 )
 
                 stacked_boards = []
@@ -735,16 +775,18 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                         self.warning("ignoring stacked board (corrupted)")
                         continue
 
-                    stacked_boards.append((
-                        path.name.split(STACKED, 1)[-1],
-                        Vector((offset[0], -offset[1], offset[2])),
-                    ))
+                    stacked_boards.append(
+                        (
+                            path.name.split(STACKED, 1)[-1],
+                            Vector((offset[0], -offset[1], offset[2])),
+                        )
+                    )
 
                 boards[board_dir.name] = Board(bounds, stacked_boards)
 
         pads = {}
         if not (pads_path := (zip_path / PADS)).exists():
-            self.warning(f"old file format: PCB3D file doesn't contain \"{PADS}\" dir")
+            self.warning(f'old file format: PCB3D file doesn\'t contain "{PADS}" dir')
         else:
             for path in pads_path.iterdir():
                 try:
@@ -753,7 +795,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                     self.warning(f"old file format: failed to parse pads")
                     break
 
-        return PCB3D(pcb_file_content, components, layers_bounds, stackup, boards, pads)
+        return PCB3D(pcb_file_content, list(components), layers_bounds, stackup, boards, pads)
 
     @staticmethod
     def get_boundingbox(context, bounds, material_index):
@@ -998,7 +1040,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
             box.prop(self, "fpnl_setup_camera")
 
             filebrowser_params = context.space_data.params
-            filename  = Path(filebrowser_params.filename)
+            filename = Path(filebrowser_params.filename)
             directory = Path(filebrowser_params.directory.decode("utf-8"))
 
             if filename.suffix == ".pcb3d":
@@ -1011,6 +1053,7 @@ class PCB2BLENDER_OT_import_pcb3d(bpy.types.Operator, ImportHelper, ErrorHelper)
                         self.fpnl_path = ""
             else:
                 self.fpnl_path = ""
+
 
 PCB2_LAYER_NAMES = (
     "Board",
@@ -1053,10 +1096,11 @@ regex_component = re.compile(
     r"children\s*\[\s*Inline\s*{\s*url\s*\"(?P<url>[^\"]*)\"\s*}\s*]\s*}\s*"
 )
 
+
 def match2matrix(match):
-    rotation    = match.group("r")
+    rotation = match.group("r")
     translation = match.group("t")
-    scale       = match.group("s")
+    scale = match.group("s")
 
     matrix = Matrix()
     if translation:
@@ -1070,6 +1114,7 @@ def match2matrix(match):
         matrix = matrix @ Matrix.Diagonal(scale).to_4x4()
 
     return matrix
+
 
 @orientation_helper(axis_forward="Y", axis_up="Z")
 class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
@@ -1096,16 +1141,17 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     )
     global_scale: FloatProperty(
         name="Scale",
-        soft_min=0.001, soft_max=1000.0,
+        soft_min=0.001,
+        soft_max=1000.0,
         default=FIX_X3D_SCALE,
         precision=4,
         step=1.0,
         description="Scale value used when 'File Unit' is set to 'CUSTOM'",
     )
 
-    join:              BoolProperty(name="Join Shapes", default=True)
-    tris_to_quads:     BoolProperty(name="Tris to Quads", default=True)
-    auto_smooth:       BoolProperty(name="Auto Smooth", default=True)
+    join: BoolProperty(name="Join Shapes", default=True)
+    tris_to_quads: BoolProperty(name="Tris to Quads", default=True)
+    auto_smooth: BoolProperty(name="Auto Smooth", default=True)
     enhance_materials: BoolProperty(name="Enhance Materials", default=True)
 
     def execute(self, context):
@@ -1114,7 +1160,7 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         objects_before = set(bpy.data.objects)
         matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
         result = import_x3d.load(
-            context, self.filepath, global_scale=self.global_scale, global_matrix=matrix,
+            context, self.filepath, global_scale=self.global_scale, global_matrix=matrix
         )
         if not result == {"FINISHED"}:
             return result
@@ -1183,10 +1229,12 @@ class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
         layout.prop(self, "auto_smooth")
         layout.prop(self, "enhance_materials")
 
+
 class PCB2BLENDER_PT_import_transform_x3d(X3D_PT_import_transform):
     @classmethod
     def poll(cls, context):
         return context.space_data.active_operator.bl_idname == "PCB2BLENDER_OT_import_x3d"
+
 
 # https://projects.blender.org/blender/blender/issues/117399
 def get_internal_asset_path():
@@ -1196,10 +1244,13 @@ def get_internal_asset_path():
             return path
     assert False
 
+
 SMOOTH_BY_ANGLE_ASSET_PATH = str(
     get_internal_asset_path() / "geometry_nodes" / "smooth_by_angle.blend"
 )
 SMOOTH_BY_ANGLE_NODE_GROUP_NAME = "Smooth by Angle"
+
+
 def add_smooth_by_angle_modifier(obj):
     global SMOOTH_BY_ANGLE_NODE_GROUP_NAME
 
@@ -1213,15 +1264,20 @@ def add_smooth_by_angle_modifier(obj):
     modifier = obj.modifiers.new("Smooth by Angle", "NODES")
     modifier.node_group = smooth_by_angle_node_group
 
+
 def has_svg2blender():
     return addon_utils.check("svg2blender_importer") == (True, True)
+
 
 def menu_func_import_pcb3d(self, context):
     self.layout.operator(PCB2BLENDER_OT_import_pcb3d.bl_idname, text="PCB (.pcb3d)")
 
+
 def menu_func_import_x3d(self, context):
-    self.layout.operator(PCB2BLENDER_OT_import_x3d.bl_idname,
-        text="X3D/VRML (.x3d/.wrl) (for pcb3d)")
+    self.layout.operator(
+        PCB2BLENDER_OT_import_x3d.bl_idname, text="X3D/VRML (.x3d/.wrl) (for pcb3d)"
+    )
+
 
 classes = (
     PCB2BLENDER_OT_import_pcb3d,
@@ -1229,12 +1285,14 @@ classes = (
     PCB2BLENDER_PT_import_transform_x3d,
 )
 
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import_x3d)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import_pcb3d)
+
 
 def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import_pcb3d)
