@@ -5,7 +5,7 @@ from pathlib import Path
 from subprocess import DEVNULL, CalledProcessError, check_call
 
 import tomlkit
-from error_helper import *
+from error_helper import warning
 
 FILE_DIR = Path(__file__).parent
 BLENDER_ADDON_DIR = FILE_DIR / "pcb2blender_importer"

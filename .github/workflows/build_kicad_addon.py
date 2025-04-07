@@ -6,6 +6,7 @@ from hashlib import sha256
 from itertools import chain
 from pathlib import Path
 from subprocess import check_output
+from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import requests
@@ -18,7 +19,7 @@ def build_kicad_addon(
     icon: Path | None = None,
     extra_files: list[Path] = [],
 ):
-    metadata: dict = json.loads((path / "metadata.json").read_text())
+    metadata: dict[str, Any] = json.loads((path / "metadata.json").read_text())
 
     version_str = metadata["versions"][0]["version"].replace(".", "-")
     kicad_version_str = metadata["versions"][0]["kicad_version"].replace(".", "-")
@@ -42,7 +43,7 @@ def build_kicad_addon(
 
     content_library_metadata = metadata.copy()
 
-    version_metadata: dict = metadata["versions"][0].copy()
+    version_metadata: dict[str, Any] = metadata["versions"][0].copy()
     version_metadata["download_sha256"] = zip_file_hash
     repo_url = get_repo_url(path)
     download_url = f"{repo_url}/releases/download/{release_tag}/{zip_file_path}"

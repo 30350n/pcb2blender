@@ -1,13 +1,19 @@
+from typing import Any, Iterable, Literal, cast, overload
+
 import bpy
 from bl_ui import node_add_menu
 from bpy.props import EnumProperty
-from bpy.types import Menu, NodeTree, ShaderNodeCustomGroup
+from bpy.types import NodeSocketColor, NodeSocketFloat, NodeSocketShader, NodeSocketVector
 from mathutils import Color, Vector
 
-from .custom_node_utils import *
-from .mat4cad.blender import register as register_mat4cad, unregister as unregister_mat4cad
-from .mat4cad.colors import PCB_YELLOW
-from .mat4cad.core import Material, hex2rgb, lin2srgb, rgb2hex, srgb2lin
+from .custom_node_utils import NodesDef, OutputsDef, SharedCustomNodetreeNodeBase, setup_node_tree
+from .mat4cad.blender import (
+    BlenderMaterial as Mat4CadMaterial,
+    register as register_mat4cad,
+    unregister as unregister_mat4cad,
+)
+from .mat4cad.colors import PCB_COLORS
+from .mat4cad.core import hex2rgb, lin2srgb, rgb2hex, srgb2lin
 
 LAYER_BOARD_EDGE = "pcb_board_edge"
 LAYER_THROUGH_HOLES = "pcb_through_holes"
@@ -35,12 +41,12 @@ KICAD_2_MAT4CAD = {
 }
 
 
-def merge_materials(meshes):
+def merge_materials(meshes: Iterable[bpy.types.Mesh]):
     merged_materials = {}
     for mesh in meshes:
         for i, material in enumerate(mesh.materials):
             name = remove_blender_name_suffix(material.name)
-            color = rgb2hex(material.diffuse_color)
+            color = rgb2hex(material.diffuse_color[:])
             if merged_material := merged_materials.get((name, color)):
                 mesh.materials[i] = merged_material
             else:
@@ -48,28 +54,35 @@ def merge_materials(meshes):
                 merged_materials[(name, color)] = material
 
 
-def enhance_materials(materials):
+def enhance_materials(materials: Iterable[bpy.types.Material]):
     for material in materials:
         if not material.use_nodes:
             continue
-        node_tree = material.node_tree
+        assert (node_tree := material.node_tree)
 
         material_name = remove_blender_name_suffix(material.name)
-        if mat4cad_mat := Material.from_name(material_name):
+        if mat4cad_mat := Mat4CadMaterial.from_name(material_name):
             pass
-        elif mat4cad_mat := Material.from_name(KICAD_2_MAT4CAD.get(material_name, "")):
+        elif mat4cad_mat := Mat4CadMaterial.from_name(KICAD_2_MAT4CAD.get(material_name, "")):
             pass
         else:
-            shader_nodes = (node for node in node_tree.nodes if node.type == "BSDF_PRINCIPLED")
+            shader_nodes = (
+                cast(bpy.types.ShaderNodeBsdfPrincipled, node)
+                for node in node_tree.nodes
+                if node.type == "BSDF_PRINCIPLED"
+            )
             if not (node_shader := next(shader_nodes, None)):
                 continue
 
             color = Color(node_shader.inputs["Base Color"].default_value[:3])
             probably_metal = color.s < 0.1 and color.v > 0.25
             base_material = "metal" if probably_metal else "plastic"
-            color_hex = rgb2hex(lin2srgb(color))
+            color_hex = rgb2hex(lin2srgb(color[:]))
 
-            mat4cad_mat = Material.from_name(f"{base_material}-custom_{color_hex}-semi_matte")
+            mat4cad_mat = Mat4CadMaterial.from_name(
+                f"{base_material}-custom_{color_hex}-semi_matte"
+            )
+            assert mat4cad_mat
 
         mat4cad_mat.setup_node_tree(node_tree)
 
@@ -85,7 +98,9 @@ def remove_blender_name_suffix(name: str):
     return prefix
 
 
-def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], stackup):
+def setup_pcb_material(
+    node_tree: bpy.types.ShaderNodeTree, images: dict[str, bpy.types.Image], stackup: Any
+):
     node_tree.nodes.clear()
 
     surface_finish = stackup.surface_finish.name
@@ -93,8 +108,8 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
     soldermask = stackup.mask_color.name
     soldermask_inputs = {}
     if soldermask == "CUSTOM":
-        color = Color(srgb2lin(stackup.mask_color_custom))
-        soldermask_inputs = {"Light Color": [*color, 1.0], "Dark Color": [*(color * 0.2), 1.0]}
+        color = Vector(srgb2lin(stackup.mask_color_custom))
+        soldermask_inputs = {"Light Color": color.to_4d(), "Dark Color": (color * 0.2).to_4d()}
 
     silkscreen = stackup.silks_color.name
     silkscreen_color = stackup.silks_color_custom
@@ -104,9 +119,9 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
 
     silkscreen_inputs = {}
     if silkscreen == "CUSTOM":
-        silkscreen_inputs = {"Color": [*silkscreen_color, 1.0], "Roughness": 0.25}
+        silkscreen_inputs = {"Color": Vector(silkscreen_color).to_4d(), "Roughness": 0.25}
 
-    nodes = {
+    nodes: NodesDef = {
         "cu": (
             "ShaderNodeTexImage",
             {
@@ -223,26 +238,27 @@ def setup_pcb_material(node_tree: NodeTree, images: dict[str, bpy.types.Image], 
     setup_node_tree(node_tree, nodes, label_nodes=False)
 
 
-class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase):
     bl_label = "Surface Finish BSDF"
     bl_width_default = 180
 
-    def update_props(self, context):
-        match self.surface_finish:
-            case "HASL":
-                color = hex2rgb("eaeae5")
-                roughness = 0.15
-                texture_strength = 1.0
-            case "ENIG":
-                color = hex2rgb("efdfbb")
-                roughness = 0.1
-                texture_strength = 0.3
-            case "NONE":
-                color = hex2rgb("e1bbac")
-                roughness = 0.1
-                texture_strength = 0.25
+    def update_props(self, context: bpy.types.Context):
+        surface_finish = cast(Literal["HASL", "ENIG", "NONE", "CUSTOM"], self.surface_finish)
+        if surface_finish != "CUSTOM":
+            match surface_finish:
+                case "HASL":
+                    color = hex2rgb("eaeae5")
+                    roughness = 0.15
+                    texture_strength = 1.0
+                case "ENIG":
+                    color = hex2rgb("efdfbb")
+                    roughness = 0.1
+                    texture_strength = 0.3
+                case "NONE":
+                    color = hex2rgb("e1bbac")
+                    roughness = 0.1
+                    texture_strength = 0.25
 
-        if self.surface_finish != "CUSTOM":
             self.inputs["Color"].default_value = (*srgb2lin(color), 1.0)
             self.inputs["Roughness"].default_value = roughness
             self.inputs["Texture Strength"].default_value = texture_strength
@@ -262,7 +278,7 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
         ),
     )
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
             "Color": ("NodeSocketColor", {}),
             "Roughness": ("NodeSocketFloat", {}),
@@ -270,7 +286,7 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
             "Normal": ("NodeSocketVector", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "noise": (
                 "ShaderNodeTexNoise",
@@ -338,12 +354,29 @@ class ShaderNodeBsdfPcbSurfaceFinish(SharedCustomNodetreeNodeBase, ShaderNodeCus
             ),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
+
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Roughness"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Texture Strength"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Normal"]) -> NodeSocketVector: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        def __getitem__(self, key: Literal[0] | Literal["BSDF"]) -> NodeSocketShader: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 MASK_COLOR_MAP = {
@@ -363,11 +396,11 @@ MASK_ROUGHNESS_MAP = {
 }
 
 
-class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase):
     bl_label = "Solder Mask BSDF"
     bl_width_default = 180
 
-    def update_props(self, context):
+    def update_props(self, context: bpy.types.Context):
         is_custom = self.soldermask == "CUSTOM"
         for input_name in ("Light Color", "Dark Color", "Roughness"):
             self.inputs[input_name].hide = not is_custom
@@ -393,7 +426,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ),
     )
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
             "Light Color": ("NodeSocketColor", {}),
             "Dark Color": ("NodeSocketColor", {}),
@@ -404,7 +437,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "B_Cu": ("NodeSocketFloat", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {}, {"Vector": ("tex_coord", "Object")}),
             "is_bottom_layer": (
@@ -558,13 +591,39 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             ),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
             "Color": ("NodeSocketColor", {}, ("mix_color", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
+
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Light Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Dark Color"]) -> NodeSocketColor: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Roughness"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Texture Strength"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[4] | Literal["Normal"]) -> NodeSocketVector: ...
+        @overload
+        def __getitem__(self, key: Literal[5] | Literal["F_Cu"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[6] | Literal["B_Cu"]) -> NodeSocketFloat: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["BSDF"]) -> NodeSocketShader: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 SILKS_COLOR_MAP = {
@@ -576,29 +635,29 @@ SILKS_COLOR_MAP = {
 }
 
 
-class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase):
     bl_label = "Silkscreen BSDF"
     bl_width_default = 180
 
-    def update_props(self, context):
-        match self.silkscreen:
-            case "WHITE":
-                color = hex2rgb("f3f1f0")
-                roughness = 0.1
-            case "BLACK":
-                color = hex2rgb("100f0f")
-                roughness = 0.2
+    def update_props(self, context: bpy.types.Context):
+        silkscreen = cast(Literal["WHITE", "BLACK", "CUSTOM"], self.silkscreen)
+        if silkscreen != "CUSTOM":
+            match silkscreen:
+                case "WHITE":
+                    color = hex2rgb("f3f1f0")
+                    roughness = 0.1
+                case "BLACK":
+                    color = hex2rgb("100f0f")
+                    roughness = 0.2
 
-        if self.silkscreen != "CUSTOM":
             self.inputs["Color"].default_value = (*srgb2lin(color), 1.0)
             self.inputs["Roughness"].default_value = roughness
 
-        hidden = self.silkscreen != "CUSTOM"
         for input_name in ("Color", "Roughness"):
-            self.inputs[input_name].hide = hidden
+            self.inputs[input_name].hide = self.silkscreen != "CUSTOM"
 
     silkscreen: EnumProperty(
-        name="Surface Finish",
+        name="Silkscreen",
         update=update_props,
         items=(
             ("WHITE", "White", ""),
@@ -607,7 +666,7 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
         ),
     )
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
             "Color": ("NodeSocketColor", {}),
             "Roughness": ("NodeSocketFloat", {}),
@@ -615,7 +674,7 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             "Normal": ("NodeSocketVector", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "noise": (
                 "ShaderNodeTexNoise",
@@ -655,21 +714,41 @@ class ShaderNodeBsdfPcbSilkscreen(SharedCustomNodetreeNodeBase, ShaderNodeCustom
             ),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
         self.update_props(context)
 
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Roughness"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Texture Strength"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Normal"]) -> NodeSocketVector: ...  # pyright: ignore[reportIncompatibleMethodOverride]
 
-class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        def __getitem__(self, key: Literal[0] | Literal["BSDF"]) -> NodeSocketShader: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase):
     bl_label = "Board Edge BSDF"
     bl_width_default = 180
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
-            "Base Color": ("NodeSocketColor", {"default_value": (*srgb2lin(PCB_YELLOW), 1.0)}),
+            "Base Color": (
+                "NodeSocketColor",
+                {"default_value": (*srgb2lin(PCB_COLORS["pcb_yellow"]), 1.0)},
+            ),
             "Mask Color": (
                 "NodeSocketColor",
                 {"default_value": (*srgb2lin(hex2rgb("28a125")), 1.0)},
@@ -680,7 +759,7 @@ class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomG
             "Normal": ("NodeSocketVector", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "noise": (
                 "ShaderNodeTexVoronoi",
@@ -750,18 +829,39 @@ class ShaderNodeBsdfPcbBoardEdge(SharedCustomNodetreeNodeBase, ShaderNodeCustomG
             ),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
 
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Base Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Mask Color"]) -> NodeSocketColor: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Mix"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Roughness"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[4] | Literal["Texture Strength"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[5] | Literal["Normal"]) -> NodeSocketVector: ...  # pyright: ignore[reportIncompatibleMethodOverride]
 
-class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        def __getitem__(self, key: Literal[0] | Literal["BSDF"]) -> NodeSocketShader: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase):
     bl_label = "Solder BSDF"
     bl_width_default = 180
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
             "Color": ("NodeSocketColor", {"default_value": (*srgb2lin(hex2rgb("aaaaa6")), 1.0)}),
             "Roughness": ("NodeSocketFloat", {"default_value": 0.25}),
@@ -769,7 +869,7 @@ class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "Normal": ("NodeSocketVector", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "noise_coarse": (
                 "ShaderNodeTexNoise",
@@ -836,18 +936,35 @@ class ShaderNodeBsdfSolder(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
             ),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "BSDF": ("NodeSocketShader", {}, ("shader", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
 
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Color"]) -> NodeSocketColor: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Roughness"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Texture Strength"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Normal"]) -> NodeSocketVector: ...  # pyright: ignore[reportIncompatibleMethodOverride]
 
-class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        def __getitem__(self, key: Literal[0] | Literal["BSDF"]) -> NodeSocketShader: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+class ShaderNodePcbShader(SharedCustomNodetreeNodeBase):
     bl_label = "PCB Shader"
     bl_width_default = 180
 
-    def init(self, context):
+    def init(self, context: bpy.types.Context):
         inputs = {
             "Silkscreen Quality": ("NodeSocketFloat", {"default_value": 0.8}),
             "Base Material": ("NodeSocketShader", {}),
@@ -866,7 +983,7 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "B_Paste": ("NodeSocketFloat", {"hide_value": True}),
         }
 
-        nodes = {
+        nodes: NodesDef = {
             "tex_coord": ("ShaderNodeTexCoord", {}, {}),
             "separate_position": ("ShaderNodeSeparateXYZ", {}, {"Vector": ("tex_coord", "Object")}),
             "is_bottom_layer": (
@@ -1029,14 +1146,16 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
             "displacement": ("ShaderNodeDisplacement", {}, {"Height": ("multiply_scale", 0)}),
         }
 
-        outputs = {
+        outputs: OutputsDef = {
             "Shader": ("NodeSocketShader", {}, ("mix_board_edge", 0)),
             "Displacement": ("NodeSocketVector", {}, ("displacement", 0)),
         }
 
         self.init_node_tree(inputs, nodes, outputs)
+        assert self.node_tree
 
-        color_ramp = self.node_tree.nodes["mask_blend"].color_ramp
+        color_ramp_node = cast(bpy.types.ShaderNodeValToRGB, self.node_tree.nodes["mask_blend"])
+        assert (color_ramp := color_ramp_node.color_ramp)
         color_ramp.interpolation = "B_SPLINE"
         color_ramp.elements[0].color = (1, 1, 1, 1)
         color_ramp.elements[1].position = 0.75
@@ -1044,12 +1163,56 @@ class ShaderNodePcbShader(SharedCustomNodetreeNodeBase, ShaderNodeCustomGroup):
         color_ramp.elements.new(0.5).color = (1, 1, 1, 1)
         color_ramp.elements.new(0.7).color = (0, 0, 0, 0)
 
+    class NodeInputs(bpy.types.NodeInputs):
+        @overload
+        def __getitem__(  # pyright: ignore[reportNoOverloadImplementation]
+            self, key: Literal[0] | Literal["Silkscreen Quality"]
+        ) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Base Material"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[2] | Literal["Exposed Copper"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[3] | Literal["Solder Mask"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[4] | Literal["Silkscreen"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[5] | Literal["Solder"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[6] | Literal["Board Edge"]) -> NodeSocketShader: ...
+        @overload
+        def __getitem__(self, key: Literal[7] | Literal["F_Cu"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[8] | Literal["B_Cu"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[9] | Literal["F_Mask"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[10] | Literal["B_Mask"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[11] | Literal["F_SilkS"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[12] | Literal["B_SilkS"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[13] | Literal["F_Paste"]) -> NodeSocketFloat: ...
+        @overload
+        def __getitem__(self, key: Literal[14] | Literal["B_Paste"]) -> NodeSocketFloat: ...  # pyright: ignore[reportIncompatibleMethodOverride]
 
-class NODE_MT_category_shader_pcb2blender(Menu):
+    inputs: NodeInputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    class NodeOutputs(bpy.types.NodeOutputs):
+        @overload
+        def __getitem__(self, key: Literal[0] | Literal["Shader"]) -> NodeSocketShader: ...  # pyright: ignore[reportNoOverloadImplementation]
+        @overload
+        def __getitem__(self, key: Literal[1] | Literal["Displacement"]) -> NodeSocketVector: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    outputs: NodeOutputs  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+class NODE_MT_category_shader_pcb2blender(bpy.types.Menu):
     bl_idname = "NODE_MT_category_shader_pcb2blender"
     bl_label = "Pcb2Blender"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context):
         layout = self.layout
 
         node_add_menu.add_node_type(layout, "ShaderNodeBsdfPcbSurfaceFinish")
@@ -1062,7 +1225,8 @@ class NODE_MT_category_shader_pcb2blender(Menu):
         node_add_menu.draw_assets_for_catalog(layout, self.bl_label)
 
 
-def menu_draw(self, context):
+def menu_draw(self: bpy.types.Menu, context: bpy.types.Context):
+    assert self.layout
     self.layout.separator()
     self.layout.menu("NODE_MT_category_shader_pcb2blender")
 

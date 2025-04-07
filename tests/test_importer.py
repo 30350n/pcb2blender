@@ -1,6 +1,7 @@
 from itertools import chain, product
 from pathlib import Path
 from tempfile import gettempdir
+from typing import Any
 
 import pytest
 
@@ -37,39 +38,45 @@ TEST_PARAMETERS = chain(
 )
 
 
+def pcb2blender_import_pcb3d(**kwargs: Any) -> set[str]:
+    return bpy.ops.pcb2blender.import_pcb3d(**kwargs)  # pyright: ignore[reportAttributeAccessIssue]
+
+
 @pytest.mark.parametrize("path", TEST_FILEPATHS)
 @pytest.mark.filterwarnings("ignore:.*U.*mode is deprecated:DeprecationWarning")
-def test_importer(capsys, path):
+def test_importer(capsys: pytest.CaptureFixture[str], path: Path):
     bpy.ops.wm.read_homefile(use_empty=True)
 
-    result = bpy.ops.pcb2blender.import_pcb3d(filepath=str(path))
+    result = pcb2blender_import_pcb3d(filepath=str(path))
 
     if error := capsys.readouterr().err:
         raise Exception(error)
     assert result == {"FINISHED"}
+    assert bpy.context.view_layer
     assert len(bpy.context.view_layer.objects) > 0
     assert bpy.context.object is not None
 
 
 @pytest.mark.parametrize("kwargs", TEST_PARAMETERS)
 @pytest.mark.filterwarnings("ignore:.*U.*mode is deprecated:DeprecationWarning")
-def test_importer_parameters(capsys, kwargs):
+def test_importer_parameters(capsys: pytest.CaptureFixture[str], **kwargs: Any):
     bpy.ops.wm.read_homefile(use_empty=True)
 
-    result = bpy.ops.pcb2blender.import_pcb3d(filepath=str(TEST_FILEPATHS[0]), **kwargs)
+    result = pcb2blender_import_pcb3d(filepath=str(TEST_FILEPATHS[0]), **kwargs)
 
     if error := capsys.readouterr().err:
         raise Exception(error)
     assert result == {"FINISHED"}
+    assert bpy.context.view_layer
     assert len(bpy.context.view_layer.objects) > 0
     assert bpy.context.object is not None
 
 
-def test_load_file(capsys):
+def test_load_file(capsys: pytest.CaptureFixture[str]):
     test_path = str(Path(gettempdir()) / "pcb2blender_test.blend")
 
     bpy.ops.wm.read_homefile(use_empty=True)
-    bpy.ops.pcb2blender.import_pcb3d(filepath=str(TEST_FILEPATHS[0]))
+    pcb2blender_import_pcb3d(filepath=str(TEST_FILEPATHS[0]))
     bpy.ops.wm.save_mainfile(filepath=test_path)
 
     assert not has_undefined_nodes()

@@ -2,9 +2,13 @@ from pathlib import Path
 
 import wx
 
+from .export import BoardDef
+
 
 class SettingsDialog(wx.Dialog):
-    def __init__(self, parent, boarddefs, ignored):
+    def __init__(
+        self, parent: wx.Window | None, boarddefs: dict[str, BoardDef], ignored: list[str]
+    ):
         wx.Dialog.__init__(self, parent, title="Export to Blender")
 
         panel = self.init_panel(boarddefs, ignored)
@@ -16,7 +20,7 @@ class SettingsDialog(wx.Dialog):
         self.Center()
         self.Show()
 
-    def on_export(self, event):
+    def on_export(self, event: wx.Event):
         path = Path(self.file_picker.GetPath())
         if path.parent.exists():
             self.EndModal(wx.OK)
@@ -27,7 +31,7 @@ class SettingsDialog(wx.Dialog):
                 style=wx.CENTER | wx.ICON_ERROR | wx.OK,
             )
 
-    def init_panel(self, boarddefs, ignored):
+    def init_panel(self, boarddefs: dict[str, BoardDef], ignored: list[str]):
         panel = wx.Panel(self)
 
         rows = wx.BoxSizer(orient=wx.VERTICAL)

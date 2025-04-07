@@ -9,7 +9,6 @@ from typing import List, Tuple
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
-from pcbnew import DRILL_MARKS_NO_DRILL_SHAPE, PLOT_CONTROLLER, PLOT_FORMAT_SVG, ToMM
 
 PCB = "pcb.wrl"
 COMPONENTS = "components"
@@ -86,7 +85,7 @@ class Stackup:
         )
 
 
-def export_pcb3d(filepath, boarddefs):
+def export_pcb3d(filepath: Path, boarddefs: dict[str, BoardDef]):
     init_tempdir()
 
     wrl_path = get_temppath(PCB)
@@ -94,13 +93,13 @@ def export_pcb3d(filepath, boarddefs):
     pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(LAYERS)
-    board = pcbnew.GetBoard()
-    box = board.ComputeBoundingBox(aBoardEdgesOnly=True)
+    board: pcbnew.BOARD = pcbnew.GetBoard()
+    box: pcbnew.BOX2I = board.ComputeBoundingBox(aBoardEdgesOnly=True)
     bounds = (
         ToMM(box.GetLeft()) - SVG_MARGIN,
         ToMM(box.GetTop()) - SVG_MARGIN,
-        ToMM(box.GetRight() - box.GetLeft()) + SVG_MARGIN * 2,
-        ToMM(box.GetBottom() - box.GetTop()) + SVG_MARGIN * 2,
+        ToMM(box.GetWidth()) + SVG_MARGIN * 2,
+        ToMM(box.GetHeight()) + SVG_MARGIN * 2,
     )
     export_layers(board, bounds, layers_path)
 
@@ -128,6 +127,7 @@ def export_pcb3d(filepath, boarddefs):
                     f"{subdir}/{STACKED}{stacked.name}", struct.pack("!fff", *stacked.offset)
                 )
 
+        footprint: pcbnew.FOOTPRINT
         for i, footprint in enumerate(board.Footprints()):
             has_model = len(footprint.Models()) > 0
             is_tht_or_smd = bool(
@@ -135,44 +135,48 @@ def export_pcb3d(filepath, boarddefs):
             )
             value = footprint.GetValue()
             reference = footprint.GetReference()
+
+            pad: pcbnew.PAD
             for j, pad in enumerate(footprint.Pads()):
                 name = sanitized(f"{value}_{reference}_{i}_{j}")
                 is_flipped = pad.IsFlipped()
                 has_paste = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
                 data = struct.pack(
                     "!ff????BBffffBff",
-                    *map(ToMM, pad.GetPosition()),
+                    ToMM2D(pad.GetPosition()),
                     is_flipped,
                     has_model,
                     is_tht_or_smd,
                     has_paste,
                     pad.GetAttribute(),
                     pad.GetShape(),
-                    *map(ToMM, pad.GetSize()),
+                    ToMM2D(pad.GetSize()),
                     pad.GetOrientation().AsRadians(),
                     pad.GetRoundRectRadiusRatio(),
                     pad.GetDrillShape(),
-                    *map(ToMM, pad.GetDrillSize()),
+                    ToMM2D(pad.GetDrillSize()),
                 )
                 file.writestr(f"{PADS}/{name}", data)
 
 
-def get_boarddefs(board):
-    boarddefs = {}
-    ignored = []
+def get_boarddefs(board: pcbnew.BOARD):
+    boarddefs: dict[str, BoardDef] = {}
+    ignored: list[str] = []
 
-    tls = {}
-    brs = {}
-    stacks = {}
+    tls: dict[str, tuple[float, float]] = {}
+    brs: dict[str, tuple[float, float]] = {}
+    stacks: dict[str, tuple[float, float]] = {}
+
+    drawing: pcbnew.BOARD_ITEM
     for drawing in board.GetDrawings():
         if drawing.Type() == pcbnew.PCB_TEXT_T:
-            text_obj = drawing.Cast()
-            text = text_obj.GetText()
+            text_obj: pcbnew.PCB_TEXT = drawing.Cast()
+            text: str = text_obj.GetText()
 
             if not text.startswith("PCB3D_"):
                 continue
 
-            pos = tuple(map(ToMM, text_obj.GetPosition()))
+            pos = ToMM2D(text_obj.GetPosition())
             if text.startswith("PCB3D_TL_"):
                 tls.setdefault(text, pos)
             elif text.startswith("PCB3D_BR_"):
@@ -223,7 +227,7 @@ def get_boarddefs(board):
     return boarddefs, ignored
 
 
-def get_stackup(board):
+def get_stackup(board: pcbnew.BOARD) -> Stackup:
     stackup = Stackup()
 
     tmp_path = get_temppath("pcb2blender_tmp.kicad_pcb")
@@ -249,16 +253,18 @@ def get_stackup(board):
     return stackup
 
 
-def parse_kicad_color(string):
+def parse_kicad_color(string: str) -> tuple[KiCadColor, tuple[int, int, int]]:
     if string[0] == "#":
         return KiCadColor.CUSTOM, hex2rgb(string[1:7])
     else:
         return KiCadColor[string.upper()], (0, 0, 0)
 
 
-def export_layers(board, bounds, output_directory: Path):
-    plot_controller = PLOT_CONTROLLER(board)
-    plot_options = plot_controller.GetPlotOptions()
+def export_layers(
+    board: pcbnew.BOARD, bounds: tuple[float, float, float, float], output_directory: Path
+):
+    plot_controller = pcbnew.PLOT_CONTROLLER(board)
+    plot_options: pcbnew.PCB_PLOT_PARAMS = plot_controller.GetPlotOptions()
     plot_options.SetOutputDirectory(output_directory)
 
     plot_options.SetPlotFrameRef(False)
@@ -266,11 +272,11 @@ def export_layers(board, bounds, output_directory: Path):
     plot_options.SetScale(1)
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(True)
-    plot_options.SetDrillMarksType(DRILL_MARKS_NO_DRILL_SHAPE)
+    plot_options.SetDrillMarksType(pcbnew.DRILL_MARKS_NO_DRILL_SHAPE)
 
     for layer in INCLUDED_LAYERS:
         plot_controller.SetLayer(getattr(pcbnew, layer))
-        plot_controller.OpenPlotfile(layer, PLOT_FORMAT_SVG, "")
+        plot_controller.OpenPlotfile(layer, pcbnew.PLOT_FORMAT_SVG, "")
         plot_controller.PlotLayer()
         filepath = Path(plot_controller.GetPlotFileName())
         plot_controller.ClosePlot()
@@ -284,7 +290,7 @@ def export_layers(board, bounds, output_directory: Path):
         filepath.write_text(content, encoding="utf-8")
 
 
-def sanitized(name):
+def sanitized(name: str):
     return re.sub(r"[\W]+", "_", name)
 
 
@@ -292,7 +298,7 @@ def get_tempdir():
     return Path(tempfile.gettempdir()) / "pcb2blender_tmp"
 
 
-def get_temppath(filename):
+def get_temppath(filename: str):
     return get_tempdir() / filename
 
 
@@ -314,12 +320,20 @@ def init_tempdir():
     tempdir.mkdir()
 
 
-def hex2rgb(hex_string):
+def hex2rgb(hex_string: str):
     return (
         int(hex_string[0:2], 16),
         int(hex_string[2:4], 16),
         int(hex_string[4:6], 16),
     )
+
+
+def ToMM(value: float | int) -> float:
+    return pcbnew.ToMM(value)  # pyright: ignore[reportReturnType]
+
+
+def ToMM2D(value: tuple[float, float] | tuple[int, int]) -> tuple[float, float]:
+    return pcbnew.ToMM(value)  # pyright: ignore[reportReturnType]
 
 
 SVG_HEADER_REGEX = re.compile(

@@ -1,9 +1,17 @@
+from typing import TYPE_CHECKING, assert_never
+
 import bpy
 import numpy as np
-from bpy.props import *
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty
+from numpy.typing import NDArray
 
-from .custom_node_utils import setup_node_tree
+from .custom_node_utils import NodesDef, setup_node_tree
 from .importer import MM_TO_M
+
+if TYPE_CHECKING:
+    from bpy._typing.rna_enums import OperatorReturnItems
+else:
+    OperatorReturnItems = str
 
 
 class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
@@ -65,10 +73,13 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
 
     reuse_material: BoolProperty(name="Reuse Material", default=False)
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[OperatorReturnItems]:
+        assert context.collection and context.view_layer
+
         name = "Solder Joint"
         mesh = bpy.data.meshes.new(name)
         obj = bpy.data.objects.new(name, mesh)
+
         context.collection.objects.link(obj)
 
         if self.pad_shape == "SQUARE":
@@ -82,6 +93,8 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
             verts, faces = solder_joint_tht(pad_size, hole_size, self.roundness, self.pcb_thickness)
         elif self.pad_type == "SMD":
             verts, faces = solder_joint_smd(pad_size, self.roundness, self.pcb_thickness)
+        else:
+            assert_never(self.pad_type)
 
         verts *= MM_TO_M
         indices = faces.flatten()
@@ -103,8 +116,9 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         if not (self.reuse_material and (material := bpy.data.materials.get(name))):
             material = bpy.data.materials.new(name)
             material.use_nodes = True
+            assert material.node_tree
             material.node_tree.nodes.clear()
-            nodes = {
+            nodes: NodesDef = {
                 "shader": ("ShaderNodeBsdfSolder", {}, {}),
                 "output": (
                     "ShaderNodeOutputMaterial",
@@ -144,8 +158,8 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
 
         return {"FINISHED"}
 
-    def draw(self, context):
-        layout = self.layout
+    def draw(self, context: bpy.types.Context):
+        assert (layout := self.layout)
         layout.use_property_split = True
 
         layout.prop(self, "pad_type")
@@ -168,7 +182,12 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
         layout.prop(self, "rotation")
 
 
-def solder_joint_tht(pad_size, hole_size, roundness=0.0, pcb_thickness=1.6):
+def solder_joint_tht(
+    pad_size: NDArray[np.float64],
+    hole_size: NDArray[np.float64],
+    roundness: float = 0.0,
+    pcb_thickness: float = 1.6,
+):
     vs = np.empty((0, 3), dtype=float)
     fs = np.empty((0, 4), dtype=int)
 
@@ -188,7 +207,9 @@ def solder_joint_tht(pad_size, hole_size, roundness=0.0, pcb_thickness=1.6):
     return vs, fs
 
 
-def solder_joint_smd(pad_size, roundness=0.0, pcb_thickness=1.6):
+def solder_joint_smd(
+    pad_size: NDArray[np.float64], roundness: float = 0.0, pcb_thickness: float = 1.6
+):
     vs = np.empty((0, 3), dtype=float)
     fs = np.empty((0, 4), dtype=int)
 
@@ -202,7 +223,14 @@ def solder_joint_smd(pad_size, roundness=0.0, pcb_thickness=1.6):
 MAX_ROUNDNESS_FAC = 1 - 1 / np.tan(np.deg2rad(135.0 / 2))
 
 
-def add_octagon_layer(verts, faces, size, z, roundness=0.5, fill=False):
+def add_octagon_layer(
+    verts: NDArray[np.float64],
+    faces: NDArray[np.int64],
+    size: NDArray[np.float64],
+    z: float,
+    roundness: float = 0.5,
+    fill: bool = False,
+):
     half_size = size * 0.5
     min_half_size = half_size.min()
     r_offset = min_half_size * roundness * MAX_ROUNDNESS_FAC
@@ -259,7 +287,8 @@ def add_octagon_layer(verts, faces, size, z, roundness=0.5, fill=False):
 classes = (PCB2BLENDER_OT_solder_joint_add,)
 
 
-def menu_func_solder_joint_add(self, context):
+def menu_func_solder_joint_add(self: bpy.types.Menu, context: bpy.types.Context):
+    assert self.layout
     self.layout.separator()
     self.layout.operator(PCB2BLENDER_OT_solder_joint_add.bl_idname, icon="PROP_CON")
 
