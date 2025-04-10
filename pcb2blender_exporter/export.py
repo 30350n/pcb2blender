@@ -1,59 +1,14 @@
 import re
 import shutil
-import struct
 import tempfile
-from dataclasses import dataclass, field
-from enum import IntEnum
 from pathlib import Path
-from typing import List, Tuple
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
 
-PCB = "pcb.wrl"
-COMPONENTS = "components"
-LAYERS = "layers"
-LAYERS_BOUNDS = "bounds"
-LAYERS_STACKUP = "stackup"
-BOARDS = "boards"
-BOUNDS = "bounds"
-STACKED = "stacked_"
-PADS = "pads"
-
-INCLUDED_LAYERS = ("F_Cu", "B_Cu", "F_Paste", "B_Paste", "F_SilkS", "B_SilkS", "F_Mask", "B_Mask")
+from .pcb3d import PCB3D, Board, Bounds, KiCadColor, Pad, StackedBoard, Stackup, SurfaceFinish
 
 SVG_MARGIN = 1.0  # mm
-
-
-@dataclass
-class StackedBoard:
-    name: str
-    offset: Tuple[float, float, float]
-
-
-@dataclass
-class BoardDef:
-    name: str
-    bounds: Tuple[float, float, float, float]
-    stacked_boards: List[StackedBoard] = field(default_factory=list)
-
-
-class KiCadColor(IntEnum):
-    CUSTOM = 0
-    GREEN = 1
-    RED = 2
-    BLUE = 3
-    PURPLE = 4
-    BLACK = 5
-    WHITE = 6
-    YELLOW = 7
-
-
-class SurfaceFinish(IntEnum):
-    HASL = 0
-    ENIG = 1
-    NONE = 2
-
 
 SURFACE_FINISH_MAP = {
     "ENIG": SurfaceFinish.ENIG,
@@ -64,103 +19,58 @@ SURFACE_FINISH_MAP = {
 }
 
 
-@dataclass
-class Stackup:
-    thickness_mm: float = 1.6
-    mask_color: KiCadColor = KiCadColor.GREEN
-    mask_color_custom: Tuple[int, int, int] = (0, 0, 0)
-    silks_color: KiCadColor = KiCadColor.WHITE
-    silks_color_custom: Tuple[int, int, int] = (0, 0, 0)
-    surface_finish: SurfaceFinish = SurfaceFinish.HASL
-
-    def pack(self) -> bytes:
-        return struct.pack(
-            "!fbBBBbBBBb",
-            self.thickness_mm,
-            self.mask_color,
-            *self.mask_color_custom,
-            self.silks_color,
-            *self.silks_color_custom,
-            self.surface_finish,
-        )
-
-
-def export_pcb3d(filepath: Path, boarddefs: dict[str, BoardDef]):
+def export_pcb3d(filepath: Path, boarddefs: dict[str, Board]):
     init_tempdir()
 
-    wrl_path = get_temppath(PCB)
-    components_path = get_temppath(COMPONENTS)
+    wrl_path = get_temppath(PCB3D.PCB)
+    components_path = get_temppath(PCB3D.COMPONENTS)
     pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
 
-    layers_path = get_temppath(LAYERS)
+    layers_path = get_temppath(PCB3D.LAYERS)
     board: pcbnew.BOARD = pcbnew.GetBoard()
     box: pcbnew.BOX2I = board.ComputeBoundingBox(aBoardEdgesOnly=True)
-    bounds = (
-        ToMM(box.GetLeft()) - SVG_MARGIN,
-        ToMM(box.GetTop()) - SVG_MARGIN,
-        ToMM(box.GetWidth()) + SVG_MARGIN * 2,
-        ToMM(box.GetHeight()) + SVG_MARGIN * 2,
+    bounds = Bounds(
+        (ToMM(box.GetLeft()) - SVG_MARGIN, ToMM(box.GetTop()) - SVG_MARGIN),
+        (ToMM(box.GetWidth()) + SVG_MARGIN * 2, ToMM(box.GetHeight()) + SVG_MARGIN * 2),
     )
     export_layers(board, bounds, layers_path)
 
-    with ZipFile(filepath, mode="w", compression=ZIP_DEFLATED) as file:
-        # always ensure the COMPONENTS, LAYERS and BOARDS directories are created
-        file.writestr(f"{COMPONENTS}/", "")
-        file.writestr(f"{LAYERS}/", "")
-        file.writestr(f"{BOARDS}/", "")
+    pads = {}
+    footprint: pcbnew.FOOTPRINT
+    for i, footprint in enumerate(board.Footprints()):
+        has_model = len(footprint.Models()) > 0
+        is_tht_or_smd = bool(footprint.GetAttributes() & (pcbnew.FP_THROUGH_HOLE | pcbnew.FP_SMD))
+        value = footprint.GetValue()
+        reference = footprint.GetReference()
 
-        file.write(wrl_path, PCB)
-        for path in components_path.glob("**/*.wrl"):
-            file.write(path, f"{COMPONENTS}/{path.name}")
-
-        for path in layers_path.glob("**/*.svg"):
-            file.write(path, f"{LAYERS}/{path.name}")
-        file.writestr(f"{LAYERS}/{LAYERS_BOUNDS}", struct.pack("!ffff", *bounds))
-        file.writestr(f"{LAYERS}/{LAYERS_STACKUP}", get_stackup(board).pack())
-
-        for boarddef in boarddefs.values():
-            subdir = f"{BOARDS}/{boarddef.name}"
-            file.writestr(f"{subdir}/{BOUNDS}", struct.pack("!ffff", *boarddef.bounds))
-
-            for stacked in boarddef.stacked_boards:
-                file.writestr(
-                    f"{subdir}/{STACKED}{stacked.name}", struct.pack("!fff", *stacked.offset)
-                )
-
-        footprint: pcbnew.FOOTPRINT
-        for i, footprint in enumerate(board.Footprints()):
-            has_model = len(footprint.Models()) > 0
-            is_tht_or_smd = bool(
-                footprint.GetAttributes() & (pcbnew.FP_THROUGH_HOLE | pcbnew.FP_SMD)
+        pad: pcbnew.PAD
+        for j, pad in enumerate(footprint.Pads()):
+            name = sanitized(f"{value}_{reference}_{i}_{j}")
+            is_flipped = pad.IsFlipped()
+            has_paste = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
+            pads[name] = Pad(
+                ToMM2D(pad.GetPosition()),
+                is_flipped,
+                has_model,
+                is_tht_or_smd,
+                has_paste,
+                pad.GetAttribute(),
+                pad.GetShape(),
+                ToMM2D(pad.GetSize()),
+                pad.GetOrientation().AsRadians(),
+                pad.GetRoundRectRadiusRatio(),
+                pad.GetDrillShape(),
+                ToMM2D(pad.GetDrillSize()),
             )
-            value = footprint.GetValue()
-            reference = footprint.GetReference()
 
-            pad: pcbnew.PAD
-            for j, pad in enumerate(footprint.Pads()):
-                name = sanitized(f"{value}_{reference}_{i}_{j}")
-                is_flipped = pad.IsFlipped()
-                has_paste = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
-                data = struct.pack(
-                    "!ff????BBffffBff",
-                    ToMM2D(pad.GetPosition()),
-                    is_flipped,
-                    has_model,
-                    is_tht_or_smd,
-                    has_paste,
-                    pad.GetAttribute(),
-                    pad.GetShape(),
-                    ToMM2D(pad.GetSize()),
-                    pad.GetOrientation().AsRadians(),
-                    pad.GetRoundRectRadiusRatio(),
-                    pad.GetDrillShape(),
-                    ToMM2D(pad.GetDrillSize()),
-                )
-                file.writestr(f"{PADS}/{name}", data)
+    with ZipFile(filepath, mode="w", compression=ZIP_DEFLATED) as file:
+        PCB3D(bounds, get_stackup(board), boarddefs, pads).write(
+            file, wrl_path, components_path, layers_path
+        )
 
 
 def get_boarddefs(board: pcbnew.BOARD):
-    boarddefs: dict[str, BoardDef] = {}
+    boarddefs: dict[str, Board] = {}
     ignored: list[str] = []
 
     tls: dict[str, tuple[float, float]] = {}
@@ -193,11 +103,9 @@ def get_boarddefs(board: pcbnew.BOARD):
             tl_pos = tls.pop(tl_str)
             br_pos = brs.pop(br_str)
 
-            boarddef = BoardDef(
-                sanitized(name),
-                (tl_pos[0], tl_pos[1], br_pos[0] - tl_pos[0], br_pos[1] - tl_pos[1]),
+            boarddefs[sanitized(name)] = Board(
+                Bounds((tl_pos[0], tl_pos[1]), (br_pos[0] - tl_pos[0], br_pos[1] - tl_pos[1])),
             )
-            boarddefs[boarddef.name] = boarddef
 
     for stack_str in stacks.copy():
         try:
@@ -216,11 +124,11 @@ def get_boarddefs(board: pcbnew.BOARD):
             continue
 
         stack_pos = stacks.pop(stack_str)
-        target_pos = boarddefs[target_name].bounds[:2]
+        target_pos = boarddefs[target_name].bounds.top_left
         stacked = StackedBoard(
-            other_name, (stack_pos[0] - target_pos[0], stack_pos[1] - target_pos[1], z_offset)
+            (stack_pos[0] - target_pos[0], stack_pos[1] - target_pos[1], z_offset)
         )
-        boarddefs[target_name].stacked_boards.append(stacked)
+        boarddefs[target_name].stacked_boards[other_name] = stacked
 
     ignored += list(tls.keys()) + list(brs.keys()) + list(stacks.keys())
 
@@ -260,9 +168,7 @@ def parse_kicad_color(string: str) -> tuple[KiCadColor, tuple[int, int, int]]:
         return KiCadColor[string.upper()], (0, 0, 0)
 
 
-def export_layers(
-    board: pcbnew.BOARD, bounds: tuple[float, float, float, float], output_directory: Path
-):
+def export_layers(board: pcbnew.BOARD, bounds: Bounds, output_directory: Path):
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options: pcbnew.PCB_PLOT_PARAMS = plot_controller.GetPlotOptions()
     plot_options.SetOutputDirectory(output_directory)
@@ -274,7 +180,7 @@ def export_layers(
     plot_options.SetUseGerberAttributes(True)
     plot_options.SetDrillMarksType(pcbnew.DRILL_MARKS_NO_DRILL_SHAPE)
 
-    for layer in INCLUDED_LAYERS:
+    for layer in PCB3D.INCLUDED_LAYERS:
         plot_controller.SetLayer(getattr(pcbnew, layer))
         plot_controller.OpenPlotfile(layer, pcbnew.PLOT_FORMAT_SVG, "")
         plot_controller.PlotLayer()
@@ -283,9 +189,9 @@ def export_layers(
         filepath = filepath.replace(filepath.parent / f"{layer}.svg")
 
         content = filepath.read_text(encoding="utf-8")
-        width = f"{bounds[2]:.6f}mm"
-        height = f"{bounds[3]:.6f}mm"
-        viewBox = " ".join(f"{value:.6f}" for value in bounds)
+        width = f"{bounds.size[0]:.6f}mm"
+        height = f"{bounds.size[1]:.6f}mm"
+        viewBox = " ".join(f"{value:.6f}" for value in (*bounds.top_left, *bounds.size))
         content = SVG_HEADER_REGEX.sub(SVG_HEADER_SUB.format(width, height, viewBox), content)
         filepath.write_text(content, encoding="utf-8")
 

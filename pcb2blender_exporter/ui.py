@@ -2,13 +2,11 @@ from pathlib import Path
 
 import wx
 
-from .export import BoardDef
+from .pcb3d import Board
 
 
 class SettingsDialog(wx.Dialog):
-    def __init__(
-        self, parent: wx.Window | None, boarddefs: dict[str, BoardDef], ignored: list[str]
-    ):
+    def __init__(self, parent: wx.Window | None, boarddefs: dict[str, Board], ignored: list[str]):
         wx.Dialog.__init__(self, parent, title="Export to Blender")
 
         panel = self.init_panel(boarddefs, ignored)
@@ -31,7 +29,7 @@ class SettingsDialog(wx.Dialog):
                 style=wx.CENTER | wx.ICON_ERROR | wx.OK,
             )
 
-    def init_panel(self, boarddefs: dict[str, BoardDef], ignored: list[str]):
+    def init_panel(self, boarddefs: dict[str, Board], ignored: list[str]):
         panel = wx.Panel(self)
 
         rows = wx.BoxSizer(orient=wx.VERTICAL)
@@ -61,12 +59,12 @@ class SettingsDialog(wx.Dialog):
         info.Add(text_detected, flag=wx.ALL, border=5)
 
         for name, boarddef in sorted(boarddefs.items()):
-            label = f"PCB {name} ({boarddef.bounds[2]:.2f}x{boarddef.bounds[3]:.2f}mm)"
+            label = f"PCB {name} ({boarddef.bounds.size[0]:.2f}x{boarddef.bounds.size[1]:.2f}mm)"
             if boarddef.stacked_boards:
                 label += " with "
-                for stacked in boarddef.stacked_boards:
-                    label += "front panel" if stacked.name == "FPNL" else stacked.name
-                    stack_str = ", ".join(f"{f:.2f}" for f in stacked.offset)
+                for stacked_name, offset in boarddef.stacked_boards.items():
+                    label += "front panel" if stacked_name == "FPNL" else stacked_name
+                    stack_str = ", ".join(f"{value:.2f}" for value in offset)
                     label += f" stacked at ({stack_str}), "
                 label = label[:-2] + "."
 

@@ -1,0 +1,1 @@
+../pcb2blender_importer/pcb3d.py
