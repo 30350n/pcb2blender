@@ -80,7 +80,7 @@ def export_pcb3d(filepath, boarddefs):
 
     wrl_path = get_temppath(PCB)
     components_path = get_temppath(COMPONENTS)
-    pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
+    pcbnew.ExportVRML(wrl_path, 0.001, True, True, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(LAYERS)
     board = pcbnew.GetBoard()
@@ -311,9 +311,9 @@ stackup_regex = re.compile(
 )
 stackup_thickness_regex = re.compile(r"\(thickness\s+([^) ]*)[^)]*\)")
 stackup_mask_regex  = re.compile(
-    r"\(layer\s+\"[FB].Mask\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+    r"\(layer\s+\"[FB].Mask\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
 stackup_silks_regex = re.compile(
-    r"\(layer\s+\"[FB].SilkS\"\s+(?:\([^()]*\)\s+)*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
+    r"\(layer\s+\"[FB].SilkS\".*?\(color\s+\"([^\)]*)\"\s*\)", re.DOTALL
 )
 stackup_copper_finish_regex = re.compile(r"\(copper_finish\s+\"([^\"]*)\"\s*\)")
