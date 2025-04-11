@@ -1,8 +1,10 @@
 import re
 import struct
-from dataclasses import dataclass, field
+import tomllib
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from pathlib import Path
+from types import GenericAlias
 from typing import Any, Callable
 from zipfile import Path as ZipPath, ZipFile
 
@@ -10,6 +12,47 @@ if "bpy" in locals():
     from error_helper import warning
 else:
     warning = print
+
+
+@dataclass
+class TOMLSerializable:
+    @classmethod
+    def from_toml(cls, data: str):
+        toml = tomllib.loads(data)
+        values = {}
+        for f in fields(cls):
+            value = toml[f.name]
+            if isinstance(f.type, type) and issubclass(f.type, Enum):
+                if value in f.type._member_names_:
+                    values[f.name] = f.type[value]
+                elif -1 in f.type._value2member_map_:
+                    f.type._missing_(value)
+                    values[f.name] = f.type(-1)
+            elif isinstance(f.type, (type, GenericAlias)):
+                values[f.name] = f.type(value)  # pyright: ignore[reportCallIssue]
+            else:
+                values[f.name] = value
+        return cls(**values)
+
+    def to_toml(self):
+        data = ""
+        for f in fields(self):
+            value = getattr(self, f.name)
+            data += f"{f.name} = {self._toml_value(value)}\n"
+        return data
+
+    @classmethod
+    def _toml_value(cls, value: Any) -> str:
+        if isinstance(value, (tuple, list)):
+            return f"[ {', '.join(cls._toml_value(subvalue) for subvalue in value)} ]"
+        elif isinstance(value, Enum):
+            return f'"{value.name}"'
+        elif isinstance(value, str):
+            return f'"{value}"'
+        elif isinstance(value, bool):
+            return str(value).lower()
+        else:
+            return str(value)
 
 
 class PadType(Enum):
@@ -53,7 +96,7 @@ class DrillShape(Enum):
 
 
 @dataclass
-class Pad:
+class Pad(TOMLSerializable):
     position: tuple[float, float]
     is_flipped: bool
     has_model: bool
@@ -92,23 +135,6 @@ class Pad:
             (unpacked[13], unpacked[14]),
         )
 
-    def to_bytes(self):
-        return struct.pack(
-            self.FORMAT,
-            self.position,
-            self.is_flipped,
-            self.has_model,
-            self.is_tht_or_smd,
-            self.has_paste,
-            self.pad_type.value,
-            self.shape.value,
-            self.size,
-            self.rotation,
-            self.roundness,
-            self.drill_shape,
-            self.drill_size,
-        )
-
 
 class KiCadColor(Enum):
     CUSTOM = 0
@@ -128,7 +154,7 @@ class SurfaceFinish(Enum):
 
 
 @dataclass
-class Stackup:
+class Stackup(TOMLSerializable):
     thickness_mm: float = 1.6
     mask_color: KiCadColor = KiCadColor.GREEN
     mask_color_custom: tuple[float, ...] = (0.0, 0.0, 0.0)
@@ -136,16 +162,16 @@ class Stackup:
     silks_color_custom: tuple[float, ...] = (0.0, 0.0, 0.0)
     surface_finish: SurfaceFinish = SurfaceFinish.HASL
 
-    FORMAT = "!fbBBBbBBBb"
-    FORMAT_SIZE = struct.calcsize(FORMAT)
+    OLD_FORMAT = "!fbBBBbBBBb"
+    OLD_FORMAT_SIZE = struct.calcsize(OLD_FORMAT)
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        if len(data) != cls.FORMAT_SIZE:
-            data = data[: cls.FORMAT_SIZE].ljust(cls.FORMAT_SIZE, b"\x00")
-            warning(f"unexpected stackup data size '{len(data)}' (expected {cls.FORMAT_SIZE})")
+        if len(data) != cls.OLD_FORMAT_SIZE:
+            data = data[: cls.OLD_FORMAT_SIZE].ljust(cls.OLD_FORMAT_SIZE, b"\x00")
+            warning(f"unexpected stackup data size '{len(data)}' (expected {cls.OLD_FORMAT_SIZE})")
 
-        unpacked = struct.unpack(cls.FORMAT, data)
+        unpacked = struct.unpack(cls.OLD_FORMAT, data)
         return Stackup(
             unpacked[0],
             KiCadColor(unpacked[1]),
@@ -155,32 +181,18 @@ class Stackup:
             SurfaceFinish(unpacked[9]),
         )
 
-    def to_bytes(self) -> bytes:
-        return struct.pack(
-            self.FORMAT,
-            self.thickness_mm,
-            self.mask_color,
-            *self.mask_color_custom,
-            self.silks_color,
-            *self.silks_color_custom,
-            self.surface_finish,
-        )
-
 
 @dataclass
-class Bounds:
+class Bounds(TOMLSerializable):
     top_left: tuple[float, float]
     size: tuple[float, float]
 
-    FORMAT = "!ffff"
+    OLD_FORMAT = "!ffff"
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        unpacked = struct.unpack(cls.FORMAT, data)
+        unpacked = struct.unpack(cls.OLD_FORMAT, data)
         return Bounds(unpacked[0:2], unpacked[2:4])
-
-    def to_bytes(self):
-        return struct.pack(self.FORMAT, *self.top_left, *self.size)
 
     @property
     def bottom_right(self):
@@ -192,14 +204,18 @@ class Bounds:
 
 
 class StackedBoard(tuple[float, float, float]):
-    FORMAT = "!fff"
+    OLD_FORMAT = "!fff"
+
+    @classmethod
+    def from_toml(cls, data: str):
+        return StackedBoard(tomllib.loads(data)["offset"])
+
+    def to_toml(self):
+        return f"offset = [ {self[0]}, {self[1]}, {self[2]} ]"
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return StackedBoard(struct.unpack(cls.FORMAT, data))
-
-    def to_bytes(self):
-        return struct.pack(self.FORMAT, *self)
+        return StackedBoard(struct.unpack(cls.OLD_FORMAT, data))
 
 
 @dataclass
@@ -246,11 +262,16 @@ class PCB3D:
         layers = (f"{cls.LAYERS}/{layer}.svg" for layer in cls.INCLUDED_LAYERS)
         file.extractall(extract_dir, layers)
 
-        layers_bounds_path = zip_path / cls.LAYERS / cls.LAYERS_BOUNDS
-        layers_bounds = Bounds.from_bytes(layers_bounds_path.read_bytes())
+        if (layers_bounds_path := zip_path / cls.LAYERS / cls.LAYERS_BOUNDS).exists():
+            layers_bounds = Bounds.from_toml(layers_bounds_path.read_text())
+        else:
+            old_layers_bounds_path = zip_path / cls.LAYERS / cls.LAYERS_BOUNDS[:-5]
+            layers_bounds = Bounds.from_bytes(old_layers_bounds_path.read_bytes())
 
         if (layers_stackup_path := zip_path / cls.LAYERS / cls.LAYERS_STACKUP).exists():
-            stackup = Stackup.from_bytes(layers_stackup_path.read_bytes())
+            stackup = Stackup.from_toml(layers_stackup_path.read_text())
+        elif (old_layers_stackup_path := zip_path / cls.LAYERS / cls.LAYERS_STACKUP[:-5]).exists():
+            stackup = Stackup.from_bytes(old_layers_stackup_path.read_bytes())
         else:
             stackup = Stackup()
             on_warning("old file format: cls file doesn't contain stackup")
@@ -260,13 +281,14 @@ class PCB3D:
             on_warning(f'old file format: cls file doesn\'t contain "{cls.BOARDS}" dir')
         else:
             for board_dir in boards_path.iterdir():
-                bounds_path = board_dir / cls.BOUNDS
-                if not bounds_path.exists():
-                    continue
-
                 try:
-                    bounds = Bounds.from_bytes(bounds_path.read_bytes())
-                except struct.error:
+                    if (bounds_path := board_dir / cls.BOUNDS).exists():
+                        bounds = Bounds.from_toml(bounds_path.read_text())
+                    elif (old_bounds_path := board_dir / cls.BOUNDS[:-5]).exists():
+                        bounds = Bounds.from_bytes(old_bounds_path.read_bytes())
+                    else:
+                        continue
+                except (struct.error, tomllib.TOMLDecodeError, ValueError):
                     on_warning(f'ignoring board "{board_dir}" (corrupted)')
                     continue
 
@@ -276,12 +298,17 @@ class PCB3D:
                         continue
 
                     try:
-                        stacked_board = StackedBoard.from_bytes(path.read_bytes())
-                    except struct.error:
+                        if path.suffix == ".toml":
+                            stacked_board = StackedBoard.from_toml(path.read_text())
+                        elif path.suffix == "":
+                            stacked_board = StackedBoard.from_bytes(path.read_bytes())
+                        else:
+                            continue
+                    except (struct.error, tomllib.TOMLDecodeError, ValueError):
                         on_warning("ignoring stacked board (corrupted)")
                         continue
 
-                    stacked_board_name = path.name.split(cls.STACKED, 1)[-1]
+                    stacked_board_name = path.stem.split(cls.STACKED, 1)[-1]
                     stacked_boards[stacked_board_name] = stacked_board
 
                 boards[board_dir.name] = Board(bounds, stacked_boards)
@@ -292,7 +319,12 @@ class PCB3D:
         else:
             for path in pads_path.iterdir():
                 try:
-                    pads[path.name] = Pad.from_bytes(path.read_bytes())
+                    if path.suffix == ".toml":
+                        pads[path.stem] = Pad.from_toml(path.read_text())
+                    elif path.suffix == "":
+                        pads[path.stem] = Pad.from_bytes(path.read_bytes())
+                    else:
+                        continue
                 except struct.error:
                     on_warning("old file format: failed to parse pads")
                     break
@@ -311,26 +343,26 @@ class PCB3D:
 
         for path in layers_dir.glob("**/*.svg"):
             file.write(path, f"{self.LAYERS}/{path.name}")
-        file.writestr(f"{self.LAYERS}/{self.LAYERS_BOUNDS}", self.layers_bounds.to_bytes())
-        file.writestr(f"{self.LAYERS}/{self.LAYERS_STACKUP}", self.stackup.to_bytes())
+        file.writestr(f"{self.LAYERS}/{self.LAYERS_BOUNDS}", self.layers_bounds.to_toml())
+        file.writestr(f"{self.LAYERS}/{self.LAYERS_STACKUP}", self.stackup.to_toml())
 
         for board_name, board in self.boards.items():
             subdir = f"{self.BOARDS}/{board_name}"
-            file.writestr(f"{subdir}/{self.BOUNDS}", board.bounds.to_bytes())
+            file.writestr(f"{subdir}/{self.BOUNDS}", board.bounds.to_toml())
 
             for stacked_name, stacked in board.stacked_boards.items():
-                file.writestr(f"{subdir}/{self.STACKED}{stacked_name}", stacked.to_bytes())
+                file.writestr(f"{subdir}/{self.STACKED}{stacked_name}.toml", stacked.to_toml())
 
         for pad_name, pad in self.pads.items():
-            file.writestr(f"{self.PADS}/{pad_name}", pad.to_bytes())
+            file.writestr(f"{self.PADS}/{pad_name}.toml", pad.to_toml())
 
     PCB = "pcb.wrl"
     COMPONENTS = "components"
     LAYERS = "layers"
-    LAYERS_BOUNDS = "bounds"
-    LAYERS_STACKUP = "stackup"
+    LAYERS_BOUNDS = "bounds.toml"
+    LAYERS_STACKUP = "stackup.toml"
     BOARDS = "boards"
-    BOUNDS = "bounds"
+    BOUNDS = "bounds.toml"
     STACKED = "stacked_"
     PADS = "pads"
 

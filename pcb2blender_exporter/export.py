@@ -6,7 +6,19 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
 
-from .pcb3d import PCB3D, Board, Bounds, KiCadColor, Pad, StackedBoard, Stackup, SurfaceFinish
+from .pcb3d import (
+    PCB3D,
+    Board,
+    Bounds,
+    DrillShape,
+    KiCadColor,
+    Pad,
+    PadShape,
+    PadType,
+    StackedBoard,
+    Stackup,
+    SurfaceFinish,
+)
 
 SVG_MARGIN = 1.0  # mm
 
@@ -46,20 +58,20 @@ def export_pcb3d(filepath: Path, boarddefs: dict[str, Board]):
         pad: pcbnew.PAD
         for j, pad in enumerate(footprint.Pads()):
             name = sanitized(f"{value}_{reference}_{i}_{j}")
-            is_flipped = pad.IsFlipped()
-            has_paste = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
+            is_flipped: bool = pad.IsFlipped()
+            has_paste: bool = pad.IsOnLayer(pcbnew.B_Paste if is_flipped else pcbnew.F_Paste)
             pads[name] = Pad(
                 ToMM2D(pad.GetPosition()),
                 is_flipped,
                 has_model,
                 is_tht_or_smd,
                 has_paste,
-                pad.GetAttribute(),
-                pad.GetShape(),
+                PadType(pad.GetAttribute()),
+                PadShape(pad.GetShape()),
                 ToMM2D(pad.GetSize()),
                 pad.GetOrientation().AsRadians(),
                 pad.GetRoundRectRadiusRatio(),
-                pad.GetDrillShape(),
+                DrillShape(pad.GetDrillShape()),
                 ToMM2D(pad.GetDrillSize()),
             )
 
