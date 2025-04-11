@@ -469,6 +469,11 @@ class PCB2BLENDER_OT_import_pcb3d(ImportHelper, bpy.types.Operator):
 
                 self.board_objects[name] = board_obj
 
+            bpy.ops.object.select_all(action="DESELECT")
+            for obj in self.board_objects.values():
+                obj.select_set(True)
+            context.view_layer.objects.active = next(iter(self.board_objects.values()))
+
         # fix smooth shading issues
         bpy.ops.object.shade_smooth_by_angle(angle=radians(89), keep_sharp_edges=False)
 
@@ -1064,6 +1069,7 @@ def add_smooth_by_angle_modifier(obj: Object[Mesh]):
 
     modifier = obj.modifiers.new("Smooth by Angle", "NODES")
     modifier.node_group = smooth_by_angle_node_group
+    modifier.show_group_selector = False
 
 
 def has_svg2blender():
