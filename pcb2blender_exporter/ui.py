@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import wx
 
@@ -6,7 +7,9 @@ from .pcb3d import Board
 
 
 class SettingsDialog(wx.Dialog):
-    def __init__(self, parent: wx.Window | None, boarddefs: dict[str, Board], ignored: list[str]):
+    def __init__(
+        self, parent: Optional[wx.Window], boarddefs: dict[str, Board], ignored: list[str]
+    ):
         wx.Dialog.__init__(self, parent, title="Export to Blender")
 
         panel = self.init_panel(boarddefs, ignored)

@@ -2,6 +2,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Union
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
@@ -250,11 +251,11 @@ def hex2rgb(hex_string: str):
     )
 
 
-def ToMM(value: float | int) -> float:
+def ToMM(value: Union[float, int]) -> float:
     return pcbnew.ToMM(value)  # pyright: ignore[reportReturnType]
 
 
-def ToMM2D(value: tuple[float, float] | tuple[int, int]) -> tuple[float, float]:
+def ToMM2D(value: Union[tuple[float, float], tuple[int, int]]) -> tuple[float, float]:
     return pcbnew.ToMM(value)  # pyright: ignore[reportReturnType]
 
 

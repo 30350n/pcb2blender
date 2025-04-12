@@ -1,6 +1,5 @@
 import re
 import struct
-import tomllib
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from pathlib import Path
@@ -18,7 +17,7 @@ else:
 class TOMLSerializable:
     @classmethod
     def from_toml(cls, data: str):
-        toml = tomllib.loads(data)
+        toml = load_toml(data)
         values = {}
         for f in fields(cls):
             value = toml[f.name]
@@ -224,7 +223,7 @@ class StackedBoard(tuple[float, float, float]):
 
     @classmethod
     def from_toml(cls, data: str):
-        return StackedBoard(tomllib.loads(data)["offset"])
+        return StackedBoard(load_toml(data)["offset"])
 
     def to_toml(self):
         return f"offset = [ {self[0]}, {self[1]}, {self[2]} ]"
@@ -304,7 +303,7 @@ class PCB3D:
                         bounds = Bounds.from_bytes(old_bounds_path.read_bytes())
                     else:
                         continue
-                except (struct.error, tomllib.TOMLDecodeError, ValueError):
+                except (struct.error, ValueError):
                     on_warning(f'ignoring board "{board_dir}" (corrupted)')
                     continue
 
@@ -320,7 +319,7 @@ class PCB3D:
                             stacked_board = StackedBoard.from_bytes(path.read_bytes())
                         else:
                             continue
-                    except (struct.error, tomllib.TOMLDecodeError, ValueError):
+                    except (struct.error, ValueError):
                         on_warning("ignoring stacked board (corrupted)")
                         continue
 
@@ -407,3 +406,9 @@ class PCB3D:
         r"(?:scale (?P<s>[^\n]*)\n)?\s*"
         r"children\s*\[\s*Inline\s*{\s*url\s*\"(?P<url>[^\"]*)\"\s*}\s*]\s*}\s*"
     )
+
+
+def load_toml(data: str):
+    import tomllib
+
+    return tomllib.loads(data)
