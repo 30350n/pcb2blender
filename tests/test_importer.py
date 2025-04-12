@@ -59,7 +59,7 @@ def test_importer(capsys: pytest.CaptureFixture[str], path: Path):
 
 @pytest.mark.parametrize("kwargs", TEST_PARAMETERS)
 @pytest.mark.filterwarnings("ignore:.*U.*mode is deprecated:DeprecationWarning")
-def test_importer_parameters(capsys: pytest.CaptureFixture[str], **kwargs: Any):
+def test_importer_parameters(capsys: pytest.CaptureFixture[str], kwargs: Any):
     bpy.ops.wm.read_homefile(use_empty=True)
 
     result = pcb2blender_import_pcb3d(filepath=str(TEST_FILEPATHS[0]), **kwargs)
