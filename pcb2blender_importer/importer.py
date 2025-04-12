@@ -106,12 +106,12 @@ class PCB2BLENDER_OT_import_pcb3d(ImportHelper, bpy.types.Operator):
 
     filter_glob: StringProperty(default="*.pcb3d", options={"HIDDEN"})
 
-    def __init__(self):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
         self.last_fpnl_path = ""
         self.board_objects: dict[str, Object[Mesh]] = {}
         self.component_cache: dict[str, Mesh] = {}
         self.new_materials = set()
-        super().__init__()
 
     def execute(self, context: bpy.types.Context) -> set[OperatorReturnItems]:
         assert context.view_layer and context.scene
