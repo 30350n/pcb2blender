@@ -27,8 +27,10 @@ SURFACE_FINISH_MAP = {
     "ENIG": SurfaceFinish.ENIG,
     "ENEPIG": SurfaceFinish.ENIG,
     "Hard gold": SurfaceFinish.ENIG,
+    "Immersion gold": SurfaceFinish.ENIG,
     "HT_OSP": SurfaceFinish.NONE,
     "OSP": SurfaceFinish.NONE,
+    "None": SurfaceFinish.NONE,
 }
 
 
