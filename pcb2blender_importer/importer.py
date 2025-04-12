@@ -31,7 +31,7 @@ from .materials import (
     merge_materials,
     setup_pcb_material,
 )
-from .pcb3d import PCB3D, Board, Bounds, DrillShape, PadShape, PadType
+from .pcb3d import PCB3D, Board, Bounds, DrillShape, PadFabType, PadShape, PadType
 
 if TYPE_CHECKING:
     from bpy._typing.rna_enums import OperatorReturnItems
@@ -510,6 +510,8 @@ class PCB2BLENDER_OT_import_pcb3d(ImportHelper, bpy.types.Operator):
                 if pad.pad_type not in {PadType.THT, PadType.SMD}:
                     continue
                 if pad.shape == PadShape.UNKNOWN or pad.drill_shape == DrillShape.UNKNOWN:
+                    continue
+                if pad.fab_type not in {PadFabType.NONE, PadFabType.BGA, PadFabType.CASTELLATED}:
                     continue
 
                 pad_type = pad.pad_type.name

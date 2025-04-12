@@ -95,6 +95,21 @@ class DrillShape(Enum):
         return cls.UNKNOWN
 
 
+class PadFabType(Enum):
+    NONE = 0
+    BGA = 1
+    FIDUCIAL = (2, 3)
+    TESTPOINT = 4
+    HEATSINK = 5
+    CASTELLATED = 6
+    MECHANICAL = 7
+
+    @classmethod
+    def _missing_(cls, value: Any):
+        warning(f"unknown pad fabrication attribute '{value}'")
+        return cls.NONE
+
+
 @dataclass
 class Pad(TOMLSerializable):
     position: tuple[float, float]
@@ -109,6 +124,7 @@ class Pad(TOMLSerializable):
     roundness: float
     drill_shape: DrillShape
     drill_size: tuple[float, float]
+    fab_type: PadFabType = PadFabType.NONE
 
     FORMAT = "!ff????BBffffBff"
     FORMAT_SIZE = struct.calcsize(FORMAT)

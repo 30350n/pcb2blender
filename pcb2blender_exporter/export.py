@@ -13,6 +13,7 @@ from .pcb3d import (
     DrillShape,
     KiCadColor,
     Pad,
+    PadFabType,
     PadShape,
     PadType,
     StackedBoard,
@@ -73,6 +74,7 @@ def export_pcb3d(filepath: Path, boarddefs: dict[str, Board]):
                 pad.GetRoundRectRadiusRatio(),
                 DrillShape(pad.GetDrillShape()),
                 ToMM2D(pad.GetDrillSize()),
+                PadFabType(pad.GetProperty()),
             )
 
     with ZipFile(filepath, mode="w", compression=ZIP_DEFLATED) as file:
