@@ -7,15 +7,18 @@ jobs:
     name: Build pcb2blender_exporter KiCad Addon
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version-file: pyproject.toml
+      - name: Install CI build dependencies
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.pythonLocation }}
+        run: uv sync --only-group ci
       - name: Build KiCad Addon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,33 +50,29 @@ jobs:
         run: |
           RELEASE_TAG="${GITHUB_REF_NAME%%-b*}-b${{ matrix.blender-version }}"
           echo "release-tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ steps.get-release-tag.outputs.release-tag }}
           persist-credentials: false
           submodules: recursive
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install Build Dependencies
-        run: pip install -r requirements-dev.txt
+          python-version-file: pyproject.toml
+      - name: Install CI build dependencies
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.pythonLocation }}
+        run: uv sync --only-group ci
       - name: Update Extension Dependencies
         run: python download_dependencies.py
       - name: Set up Blender
         run: |
-          SNAP_FILE=$(
-            snap download blender --channel=${{ matrix.blender-version }}/stable \
-              | tail -n 1 | sed "s/.* snap install //"
-          )
-          unsquashfs -q -n -dest blender-snap $SNAP_FILE
-          sudo snap try blender-snap --classic
-          curl https://bootstrap.pypa.io/get-pip.py -s -O
+          python .github/workflows/download_blender.py ${{ matrix.blender-version }}
       - name: Install Pytest in Blender
         run: |
+          curl https://bootstrap.pypa.io/get-pip.py -s -O
           BLENDER_VERSION=$(sed "s/[^0-9.]//g" <<< "${{ matrix.blender-version }}")
-          BLENDER_PYTHON_DIR="blender-snap/$BLENDER_VERSION/python/bin"
+          BLENDER_PYTHON_DIR="blender/$BLENDER_VERSION/python/bin"
           BLENDER_PYTHON="$BLENDER_PYTHON_DIR/$(ls $BLENDER_PYTHON_DIR | sed "s/ .*//")"
           $BLENDER_PYTHON get-pip.py
           $BLENDER_PYTHON -m pip install pytest
@@ -84,12 +83,12 @@ jobs:
         run: |
           NAME="pcb2blender_importer_$(sed "s/-k.*-/_/;s/\./-/g" <<< $RELEASE_TAG).zip"
           echo "extension_file="
-          blender --command extension build \
+          ./blender/blender --command extension build \
             --source-dir pcb2blender_importer \
             --output-filepath $NAME
-          blender --command extension install-file $NAME -r user_default -e
+          ./blender/blender --command extension install-file $NAME -r user_default -e
           sha256sum $NAME | cut -c -64 | tr -d "\n" > $NAME.sha256
           gh release upload $GITHUB_REF_NAME $NAME
           gh release upload $GITHUB_REF_NAME $NAME.sha256
       - name: Run Tests
-        run: pytest -k test_importer tests/
+        run: pytest --blender-executable ./blender/blender -k test_importer tests/
