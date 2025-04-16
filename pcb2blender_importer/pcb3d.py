@@ -1,12 +1,16 @@
 import re
 import struct
-import tomllib
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from pathlib import Path
 from types import GenericAlias
 from typing import Any, Callable
 from zipfile import Path as ZipPath, ZipFile
+
+try:
+    import tomllib
+except:
+    import tomli as tomllib # prior to python 3.11, tomllib is not available.
 
 if "bpy" in locals():
     from error_helper import warning
