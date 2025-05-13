@@ -136,7 +136,7 @@ class Pad(TOMLSerializable):
 
         unpacked = struct.unpack(cls.FORMAT, data)
         return Pad(
-            (unpacked[0], -unpacked[1]),
+            (unpacked[0], unpacked[1]),
             unpacked[2],
             unpacked[3],
             unpacked[4],
