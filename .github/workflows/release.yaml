@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        blender-version: ["4.2lts", "4.4"]
+        blender-version: ["4.2lts", "4.5lts"]
     steps:
       - name: Get Release Tag
         id: get-release-tag
