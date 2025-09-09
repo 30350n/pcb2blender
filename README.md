@@ -1,5 +1,5 @@
 [![blender](https://img.shields.io/badge/Blender-4.2_LTS-orange)](https://www.blender.org/)
-[![blender](https://img.shields.io/badge/Blender-4.4-orange)](https://www.blender.org/)
+[![blender](https://img.shields.io/badge/Blender-4.5_LTS-orange)](https://www.blender.org/)
 [![kicad](https://img.shields.io/badge/KiCad-9.0-blue)](https://www.kicad.org/)
 [![gplv3](https://img.shields.io/badge/License-GPLv3-lightgrey)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
