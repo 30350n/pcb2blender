@@ -42,6 +42,7 @@ jobs:
     name: Build pcb2blender_importer Blender Extension
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         blender-version: ["4.2lts", "4.5lts"]
     steps:
@@ -67,6 +68,7 @@ jobs:
         run: python download_dependencies.py
       - name: Set up Blender
         run: |
+          sudo apt-get update && sudo apt-get install -y libegl1
           python .github/workflows/download_blender.py ${{ matrix.blender-version }}
       - name: Install Pytest in Blender
         run: |
