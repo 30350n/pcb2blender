@@ -93,4 +93,4 @@ jobs:
           gh release upload $GITHUB_REF_NAME $NAME
           gh release upload $GITHUB_REF_NAME $NAME.sha256
       - name: Run Tests
-        run: pytest --blender-executable ./blender/blender -k test_importer tests/
+        run: pytest --blender-executable ./blender/blender -v -k test_importer tests/
