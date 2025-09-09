@@ -9,7 +9,7 @@ from .custom_node_utils import NodesDef, setup_node_tree
 from .importer import MM_TO_M
 
 if TYPE_CHECKING:
-    from bpy._typing.rna_enums import OperatorReturnItems
+    from bpy.stub_internal.rna_enums import OperatorReturnItems
 else:
     OperatorReturnItems = str
 

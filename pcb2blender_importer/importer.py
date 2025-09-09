@@ -34,7 +34,7 @@ from .materials import (
 from .pcb3d import PCB3D, Board, Bounds, DrillShape, PadFabType, PadShape, PadType
 
 if TYPE_CHECKING:
-    from bpy._typing.rna_enums import OperatorReturnItems
+    from bpy.stub_internal.rna_enums import OperatorReturnItems
 else:
     OperatorReturnItems = str
 
@@ -919,7 +919,7 @@ def match2matrix(match: re.Match[str]):
     return matrix
 
 
-@orientation_helper(axis_forward="Y", axis_up="Z")  # pyright: ignore[reportUntypedClassDecorator]
+@orientation_helper(axis_forward="Y", axis_up="Z")  # pyright: ignore[reportUntypedClassDecorator, reportOptionalCall]
 class PCB2BLENDER_OT_import_x3d(bpy.types.Operator, ImportHelper):
     __doc__ = ImportX3D.__doc__
     bl_idname = "pcb2blender.import_x3d"
