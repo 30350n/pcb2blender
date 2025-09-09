@@ -18,8 +18,8 @@ BLENDER_ADDON_WHEEL_DIR = BLENDER_ADDON_DIR / "wheels"
 BLENDER_ADDON_SUPPORTED_PLATFORMS = {
     "windows-x64": ("win_amd64",),
     "windows-arm64": ("win_arm64",),
-    "linux-x64": ("manylinux_2_17_x86_64", "manylinux_2_28_x86_64"),
-    "linux-arm64": ("manylinux_2_17_aarch64", "manylinux_2_28_aarch64"),
+    "linux-x64": ("manylinux_2_28_x86_64",),
+    "linux-arm64": ("manylinux_2_28_aarch64",),
     "macos-x64": ("macosx_10_10_x86_64", "macosx_11_0_x86_64"),
     "macos-arm64": ("macosx_11_0_arm64",),
 }
