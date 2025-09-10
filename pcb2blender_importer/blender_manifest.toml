@@ -10,7 +10,7 @@ tags = ["Import-Export"]
 blender_version_min = "4.2.0"
 blender_version_max = "4.6.0"
 license = ["SPDX:GPL-3.0-or-later"]
-platforms = ["windows-x64", "windows-arm64", "linux-x64", "macos-x64", "macos-arm64"]
+platforms = ["windows-x64", "windows-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64"]
 wheels = []
 
 [permissions]
