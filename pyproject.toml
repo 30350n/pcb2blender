@@ -20,7 +20,7 @@ dev = [
 ci = ["error-helper", "pip", "pytest", "pytest-blender", "requests", "tomlkit"]
 
 [tool.pyright]
-exclude = [".venv", "pcb2blender_importer/io_scene_x3d"]
+exclude = [".direnv", ".venv", "pcb2blender_importer/io_scene_x3d"]
 typeCheckingMode = "strict"
 reportIgnoreCommentWithoutRule = "warning"
 reportInvalidCast = "warning"

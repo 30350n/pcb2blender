@@ -1,12 +1,10 @@
 .vscode/
-.history/
 
+.direnv/
 .venv/
 __pycache__/
-site-packages/
-wheels/
 
-release/
-images/template*
 *.blend[1-9]
 *.prof
+
+wheels/
