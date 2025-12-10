@@ -115,6 +115,8 @@ class PCB2BLENDER_OT_solder_joint_add(bpy.types.Operator):
 
         if not (self.reuse_material and (material := bpy.data.materials.get(name))):
             material = bpy.data.materials.new(name)
+            if bpy.app.version < (5, 0, 0):
+                material.use_nodes = True
             assert material.node_tree
             material.node_tree.nodes.clear()
             nodes: NodesDef = {

@@ -56,6 +56,8 @@ def merge_materials(meshes: Iterable[bpy.types.Mesh]):
 
 def enhance_materials(materials: Iterable[bpy.types.Material]):
     for material in materials:
+        if bpy.app.version < (5, 0, 0) and not material.use_nodes:
+            continue
         assert (node_tree := material.node_tree)
 
         material_name = remove_blender_name_suffix(material.name)
