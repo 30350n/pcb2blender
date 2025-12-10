@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        blender-version: ["4.2lts", "4.5lts"]
+        blender-version: ["4.5lts", "5.0"]
     steps:
       - name: Get Release Tag
         id: get-release-tag
