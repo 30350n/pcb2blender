@@ -11,7 +11,7 @@
         blender = pkgs.blender.overrideAttrs (finalAttrs: prevAttrs: {
             pythonPath =
                 prevAttrs.pythonPath
-                ++ (with pkgs.python311Packages; [
+                ++ (with pkgs.python313Packages; [
                     debugpy
                     flask
                     pytest
