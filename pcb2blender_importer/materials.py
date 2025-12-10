@@ -56,8 +56,6 @@ def merge_materials(meshes: Iterable[bpy.types.Mesh]):
 
 def enhance_materials(materials: Iterable[bpy.types.Material]):
     for material in materials:
-        if not material.use_nodes:
-            continue
         assert (node_tree := material.node_tree)
 
         material_name = remove_blender_name_suffix(material.name)
@@ -163,24 +161,24 @@ def setup_pcb_material(
             {},
         ),
         "seperate_cu": (
-            "ShaderNodeSeparateRGB",
+            "ShaderNodeSeparateColor",
             {"location": (-200, -320), "hide": True},
-            {"Image": ("cu", "Color")},
+            {"Color": ("cu", "Color")},
         ),
         "seperate_mask": (
-            "ShaderNodeSeparateRGB",
+            "ShaderNodeSeparateColor",
             {"location": (-200, -360), "hide": True},
-            {"Image": ("mask", "Color")},
+            {"Color": ("mask", "Color")},
         ),
         "seperate_silks": (
-            "ShaderNodeSeparateRGB",
+            "ShaderNodeSeparateColor",
             {"location": (-200, -400), "hide": True},
-            {"Image": ("silks", "Color")},
+            {"Color": ("silks", "Color")},
         ),
         "seperate_paste": (
-            "ShaderNodeSeparateRGB",
+            "ShaderNodeSeparateColor",
             {"location": (-200, -440), "hide": True},
-            {"Image": ("paste", "Color")},
+            {"Color": ("paste", "Color")},
         ),
         "base_material": (
             "ShaderNodeBsdfMat4cad",
@@ -195,7 +193,7 @@ def setup_pcb_material(
         "solder_mask": (
             "ShaderNodeBsdfPcbSolderMask",
             {"location": (-740, 0), "soldermask": soldermask},
-            {"F_Cu": ("seperate_cu", "R"), "B_Cu": ("seperate_cu", "G"), **soldermask_inputs},
+            {"F_Cu": ("seperate_cu", "Red"), "B_Cu": ("seperate_cu", "Green"), **soldermask_inputs},
         ),
         "board_edge": (
             "ShaderNodeBsdfPcbBoardEdge",
@@ -212,14 +210,14 @@ def setup_pcb_material(
             "ShaderNodePcbShader",
             {},
             {
-                "F_Cu": ("seperate_cu", "R"),
-                "B_Cu": ("seperate_cu", "G"),
-                "F_Mask": ("seperate_mask", "R"),
-                "B_Mask": ("seperate_mask", "G"),
-                "F_SilkS": ("seperate_silks", "R"),
-                "B_SilkS": ("seperate_silks", "G"),
-                "F_Paste": ("seperate_paste", "R"),
-                "B_Paste": ("seperate_paste", "G"),
+                "F_Cu": ("seperate_cu", "Red"),
+                "B_Cu": ("seperate_cu", "Green"),
+                "F_Mask": ("seperate_mask", "Red"),
+                "B_Mask": ("seperate_mask", "Green"),
+                "F_SilkS": ("seperate_silks", "Red"),
+                "B_SilkS": ("seperate_silks", "Green"),
+                "F_Paste": ("seperate_paste", "Red"),
+                "B_Paste": ("seperate_paste", "Green"),
                 "Base Material": ("base_material", "BSDF"),
                 "Exposed Copper": ("exposed_copper", "BSDF"),
                 "Solder Mask": ("solder_mask", "BSDF"),
