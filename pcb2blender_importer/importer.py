@@ -1054,7 +1054,12 @@ def get_internal_asset_path():
 
 
 SMOOTH_BY_ANGLE_ASSET_PATH = str(
-    get_internal_asset_path() / "nodes" / "geometry_nodes_essentials.blend"
+    get_internal_asset_path()
+    / (
+        "nodes/geometry_nodes_essentials.blend"
+        if bpy.app.version >= (5, 0, 0)
+        else "geometry_nodes/smooth_by_angle.blend"
+    )
 )
 smooth_by_angle_node_group_name = "Smooth by Angle"
 
