@@ -18,7 +18,7 @@ def download_blender(version: str):
     download_path = Path(latest)
     download: requests.Response = requests.get(f"{BASE_URL}{version}/{latest}", stream=True)
     with download_path.open("wb") as file:
-        shutil.copyfileobj(download.raw, file)  # pyright: ignore[reportArgumentType]
+        shutil.copyfileobj(download.raw, file)
     with tarfile.open(Path(download_path), mode="r:xz") as file:
         file.extractall()
     download_path.unlink()

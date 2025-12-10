@@ -16,7 +16,7 @@ class SettingsDialog(wx.Dialog):
         sizer = wx.BoxSizer()
         sizer.Add(panel)
         self.SetSizerAndFit(sizer)
-        self.SetMinSize((0, 1000))
+        self.SetMinSize(wx.Size(0, 1000))
 
         self.Center()
         self.Show()
@@ -47,7 +47,7 @@ class SettingsDialog(wx.Dialog):
             message="Export as",
             wildcard="PCB 3D Model (.pcb3d)|*.pcb3d",
             style=wx.FLP_SAVE | wx.FLP_USE_TEXTCTRL | wx.FLP_OVERWRITE_PROMPT,
-            size=(300, 25),
+            size=wx.Size(300, 25),
         )
         column.Add(self.file_picker, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 
@@ -103,9 +103,9 @@ class SettingsDialog(wx.Dialog):
         rows.Add(hint, flag=wx.TOP | wx.LEFT | wx.RIGHT, border=5)
 
         buttons = wx.BoxSizer()
-        button_cancel = wx.Button(panel, id=wx.ID_CANCEL, label="Cancel", size=(85, 26))
+        button_cancel = wx.Button(panel, id=wx.ID_CANCEL, label="Cancel", size=wx.Size(85, 26))
         buttons.Add(button_cancel, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        button_export = wx.Button(panel, id=wx.ID_OK, label="Export", size=(85, 26))
+        button_export = wx.Button(panel, id=wx.ID_OK, label="Export", size=wx.Size(85, 26))
         button_export.Bind(wx.EVT_BUTTON, self.on_export)
         buttons.Add(button_export, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
 

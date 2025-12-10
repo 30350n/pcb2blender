@@ -35,7 +35,7 @@ SURFACE_FINISH_MAP = {
 }
 
 
-def export_pcb3d(filepath: Path, boarddefs: dict[str, Board]):
+def export_pcb3d(filepath: Union[str, Path], boarddefs: dict[str, Board]):
     init_tempdir()
 
     wrl_path = get_temppath(PCB3D.PCB)
