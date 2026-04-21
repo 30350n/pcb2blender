@@ -20,7 +20,7 @@ def download_blender(version: str):
     with download_path.open("wb") as file:
         shutil.copyfileobj(download.raw, file)
     with tarfile.open(Path(download_path), mode="r:xz") as file:
-        file.extractall()
+        file.extractall(filter="data")
     download_path.unlink()
 
     blender_dir = next((path for path in Path().glob("blender-*")))
