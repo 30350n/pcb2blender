@@ -7,12 +7,12 @@ jobs:
     name: Build pcb2blender_exporter KiCad Addon
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      - uses: actions/setup-python@v6
         with:
           python-version-file: pyproject.toml
       - name: Install CI build dependencies
@@ -34,7 +34,7 @@ jobs:
           gh release upload $GITHUB_REF_NAME $NAME.sha256
           gh release upload $GITHUB_REF_NAME version.json
       - name: Create Content Library Metadata Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KiCad Content Library Metadata
           path: metadata.json
@@ -51,13 +51,13 @@ jobs:
         run: |
           RELEASE_TAG="${GITHUB_REF_NAME%%-b*}-b${{ matrix.blender-version }}"
           echo "release-tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.get-release-tag.outputs.release-tag }}
           persist-credentials: false
           submodules: recursive
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      - uses: actions/setup-python@v6
         with:
           python-version-file: pyproject.toml
       - name: Install CI build dependencies
