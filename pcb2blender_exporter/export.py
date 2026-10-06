@@ -2,7 +2,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
@@ -35,7 +35,11 @@ SURFACE_FINISH_MAP = {
 }
 
 
-def export_pcb3d(filepath: Union[str, Path], boarddefs: dict[str, Board]):
+def export_pcb3d(
+    filepath: Union[str, Path],
+    boarddefs: dict[str, Board],
+    board: Optional[pcbnew.BOARD] = None,
+):
     init_tempdir()
 
     wrl_path = get_temppath(PCB3D.PCB)
@@ -43,7 +47,8 @@ def export_pcb3d(filepath: Union[str, Path], boarddefs: dict[str, Board]):
     pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(PCB3D.LAYERS)
-    board: pcbnew.BOARD = pcbnew.GetBoard()
+    if board is None:
+        board = pcbnew.GetBoard()
     box: pcbnew.BOX2I = board.ComputeBoundingBox(aBoardEdgesOnly=True)
     bounds = Bounds(
         (ToMM(box.GetLeft()) - SVG_MARGIN, ToMM(box.GetTop()) - SVG_MARGIN),
