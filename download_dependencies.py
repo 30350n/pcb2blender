@@ -22,6 +22,7 @@ BLENDER_ADDON_SUPPORTED_PLATFORMS = {
     "macos-x64": ("macosx_10_10_x86_64", "macosx_11_0_x86_64"),
     "macos-arm64": ("macosx_11_0_arm64",),
 }
+BLENDER_ADDON_SUPPORTED_PYTHON_VERSIONS = ("3.13", "3.14")
 
 DOWNLOAD_BASE_COMMAND = (
     "pip",
@@ -39,26 +40,37 @@ def download_blender_extension_dependencies():
     with PYPROJECT_TOML.open() as file:
         pyproject = cast(dict[str, Any], tomlkit.load(file))
         dependencies: list[str] = pyproject["project"]["dependencies"]
-        python_version: str = pyproject["project"]["requires-python"].strip("=.*")
 
     for dependency in dependencies:
-        for blender_platform, wheel_platforms in BLENDER_ADDON_SUPPORTED_PLATFORMS.items():
-            try:
-                output = check_output(
-                    DOWNLOAD_BASE_COMMAND
-                    + ("--python-version", python_version)
-                    + sum(zip(("--platform",) * len(wheel_platforms), wheel_platforms), ())
-                    + (dependency,),
-                    stderr=STDOUT,
-                )
-            except CalledProcessError as e:
-                warning(f"failed to download '{dependency}' for '{blender_platform}' with:")
-                warning(e.output.decode().replace("\n", "\n  "), prefix="  ")
-                continue
+        for python_version in BLENDER_ADDON_SUPPORTED_PYTHON_VERSIONS:
+            for blender_platform, wheel_platforms in BLENDER_ADDON_SUPPORTED_PLATFORMS.items():
+                try:
+                    check_output(
+                        DOWNLOAD_BASE_COMMAND
+                        + ("--python-version", python_version)
+                        + sum(zip(("--platform",) * len(wheel_platforms), wheel_platforms), ())
+                        + (dependency,),
+                        stderr=STDOUT,
+                    )
+                except CalledProcessError as e:
+                    warning(
+                        f"failed to download '{dependency}' for Python {python_version} "
+                        f"on '{blender_platform}' with:"
+                    )
+                    warning(e.output.decode().replace("\n", "\n  "), prefix="  ")
+                    continue
 
-            assert (match := re.search(r"^Saved (.*)\s*$", output.decode(), flags=re.MULTILINE))
-            if match.group(1).strip().endswith("-any.whl"):
-                break
+                dependency_name = re.sub(
+                    r"[-_.]+", "_", dependency.split("==", maxsplit=1)[0]
+                ).lower()
+                dependency_wheels = (
+                    filepath
+                    for filepath in BLENDER_ADDON_WHEEL_DIR.glob("*.whl")
+                    if re.sub(r"[-_.]+", "_", filepath.name.split("-", maxsplit=1)[0]).lower()
+                    == dependency_name
+                )
+                if any(filepath.name.endswith("-any.whl") for filepath in dependency_wheels):
+                    break
 
     for numpy_wheel in BLENDER_ADDON_WHEEL_DIR.glob("numpy-*.whl"):
         numpy_wheel.unlink()

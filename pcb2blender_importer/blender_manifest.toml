@@ -11,7 +11,7 @@ blender_version_min = "5.1.0"
 blender_version_max = "5.3.0"
 license = ["SPDX:GPL-3.0-or-later"]
 platforms = ["windows-x64", "windows-arm64", "linux-x64", "macos-x64", "macos-arm64"]
-wheels = []
+wheels = ["./wheels/skia_python-144.0.post2-cp313-cp313-win_amd64.whl", "./wheels/pillow-11.3.0-cp313-cp313-macosx_11_0_arm64.whl", "./wheels/skia_python-144.0.post2-cp313-cp313-macosx_11_0_arm64.whl", "./wheels/skia_python-144.0.post2-cp314-cp314-win_amd64.whl", "./wheels/pillow-11.3.0-cp313-cp313-win_amd64.whl", "./wheels/pillow-11.3.0-cp314-cp314-macosx_10_13_x86_64.whl", "./wheels/skia_python-144.0.post2-cp314-cp314-manylinux_2_28_x86_64.whl", "./wheels/skia_python-144.0.post2-cp314-cp314-win_arm64.whl", "./wheels/pillow-11.3.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "./wheels/skia_python-144.0.post2-cp313-cp313-win_arm64.whl", "./wheels/skia_python-144.0.post2-cp314-cp314-macosx_11_0_x86_64.whl", "./wheels/skia_python-144.0.post2-cp313-cp313-macosx_11_0_x86_64.whl", "./wheels/pillow-11.3.0-cp314-cp314-win_amd64.whl", "./wheels/pillow-11.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "./wheels/pillow-11.3.0-cp314-cp314-win_arm64.whl", "./wheels/error_helper-1.4-py3-none-any.whl", "./wheels/skia_python-144.0.post2-cp314-cp314-macosx_11_0_arm64.whl", "./wheels/pillow-11.3.0-cp314-cp314-macosx_11_0_arm64.whl", "./wheels/pillow-11.3.0-cp313-cp313-win_arm64.whl", "./wheels/skia_python-144.0.post2-cp313-cp313-manylinux_2_28_x86_64.whl", "./wheels/pillow-11.3.0-cp313-cp313-macosx_10_13_x86_64.whl", "./wheels/pybind11-3.1.0-py3-none-any.whl"]
 
 [permissions]
 files = "Import .pcb3d files from disk"
