@@ -2,7 +2,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pcbnew
@@ -35,7 +35,11 @@ SURFACE_FINISH_MAP = {
 }
 
 
-def export_pcb3d(filepath: Union[str, Path], boarddefs: dict[str, Board]):
+def export_pcb3d(
+    filepath: Union[str, Path],
+    boarddefs: dict[str, Board],
+    board: Optional[pcbnew.BOARD] = None,
+):
     init_tempdir()
 
     wrl_path = get_temppath(PCB3D.PCB)
@@ -43,7 +47,8 @@ def export_pcb3d(filepath: Union[str, Path], boarddefs: dict[str, Board]):
     pcbnew.ExportVRML(wrl_path, 0.001, True, False, True, True, components_path, 0.0, 0.0)
 
     layers_path = get_temppath(PCB3D.LAYERS)
-    board: pcbnew.BOARD = pcbnew.GetBoard()
+    if board is None:
+        board = pcbnew.GetBoard()
     box: pcbnew.BOX2I = board.ComputeBoundingBox(aBoardEdgesOnly=True)
     bounds = Bounds(
         (ToMM(box.GetLeft()) - SVG_MARGIN, ToMM(box.GetTop()) - SVG_MARGIN),
@@ -182,7 +187,10 @@ def parse_kicad_color(string: str) -> tuple[KiCadColor, tuple[int, int, int]]:
     if string[0] == "#":
         return KiCadColor.CUSTOM, hex2rgb(string[1:7])
     else:
-        return KiCadColor[string.upper()], (0, 0, 0)
+        norm = string.upper().replace(" ", "_").replace("-", "_")
+        if norm in KiCadColor._member_names_:
+            return KiCadColor[norm], (0, 0, 0)
+        return KiCadColor.GREEN, (0, 0, 0)
 
 
 def export_layers(board: pcbnew.BOARD, bounds: Bounds, output_directory: Path):

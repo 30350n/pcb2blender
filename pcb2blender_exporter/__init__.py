@@ -24,7 +24,7 @@ class Pcb2BlenderExporter(pcbnew.ActionPlugin):
         dialog: SettingsDialog
         with SettingsDialog(None, boarddefs, ignored) as dialog:
             if dialog.ShowModal() == wx.OK:
-                export_pcb3d(dialog.file_picker.GetPath(), boarddefs)
+                export_pcb3d(dialog.file_picker.GetPath(), boarddefs, board)
 
 
 Pcb2BlenderExporter().register()

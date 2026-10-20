@@ -2,6 +2,7 @@
 
 import re
 import shutil
+import sys
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, cast
@@ -24,6 +25,8 @@ BLENDER_ADDON_SUPPORTED_PLATFORMS = {
 }
 
 DOWNLOAD_BASE_COMMAND = (
+    sys.executable,
+    "-m",
     "pip",
     "download",
     *("--dest", BLENDER_ADDON_WHEEL_DIR),

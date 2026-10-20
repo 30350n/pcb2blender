@@ -99,13 +99,18 @@ def remove_blender_name_suffix(name: str):
 
 
 def setup_pcb_material(
-    node_tree: bpy.types.ShaderNodeTree, images: dict[str, bpy.types.Image], stackup: Any
+    node_tree: bpy.types.ShaderNodeTree,
+    images: dict[str, bpy.types.Image],
+    stackup: Any,
+    black_mask_finish: str = "MATTE_BLACK",
 ):
     node_tree.nodes.clear()
 
     surface_finish = stackup.surface_finish.name
 
     soldermask = stackup.mask_color.name
+    if soldermask == "BLACK" and black_mask_finish == "MATTE_BLACK":
+        soldermask = "MATTE_BLACK"
     soldermask_inputs = {}
     if soldermask == "CUSTOM":
         color = Vector(srgb2lin(stackup.mask_color_custom))
@@ -582,7 +587,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase):
                 {},
                 {
                     "Base Color": ("scratches", "Color"),
-                    "Metallic": 0.6,
+                    "Metallic": 0.0,
                     "Subsurface Weight": ("subsurface", 0),
                     "Subsurface Radius": ("ssr", 0),
                     "Roughness": ("scratches", "Roughness"),
@@ -1226,6 +1231,8 @@ class NODE_MT_category_shader_pcb2blender(bpy.types.Menu):
 
 
 def menu_draw(self: bpy.types.Menu, context: bpy.types.Context):
+    if getattr(context.space_data, "tree_type", None) != "ShaderNodeTree":
+        return
     assert self.layout
     self.layout.separator()
     self.layout.menu("NODE_MT_category_shader_pcb2blender")
@@ -1248,13 +1255,20 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.NODE_MT_shader_node_add_all.append(menu_draw)
+    if hasattr(bpy.types, "NODE_MT_add"):
+        bpy.types.NODE_MT_add.append(menu_draw)
+    elif hasattr(bpy.types, "NODE_MT_shader_node_add_all"):
+        bpy.types.NODE_MT_shader_node_add_all.append(menu_draw)
 
 
 def unregister():
-    bpy.types.NODE_MT_shader_node_add_all.remove(menu_draw)
+    if hasattr(bpy.types, "NODE_MT_add"):
+        bpy.types.NODE_MT_add.remove(menu_draw)
+    elif hasattr(bpy.types, "NODE_MT_shader_node_add_all"):
+        bpy.types.NODE_MT_shader_node_add_all.remove(menu_draw)
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
 
     unregister_mat4cad()
+
