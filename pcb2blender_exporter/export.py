@@ -187,7 +187,10 @@ def parse_kicad_color(string: str) -> tuple[KiCadColor, tuple[int, int, int]]:
     if string[0] == "#":
         return KiCadColor.CUSTOM, hex2rgb(string[1:7])
     else:
-        return KiCadColor[string.upper()], (0, 0, 0)
+        norm = string.upper().replace(" ", "_").replace("-", "_")
+        if norm in KiCadColor._member_names_:
+            return KiCadColor[norm], (0, 0, 0)
+        return KiCadColor.GREEN, (0, 0, 0)
 
 
 def export_layers(board: pcbnew.BOARD, bounds: Bounds, output_directory: Path):

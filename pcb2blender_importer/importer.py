@@ -93,6 +93,15 @@ class PCB2BLENDER_OT_import_pcb3d(ImportHelper, bpy.types.Operator):
     texture_dpi: FloatProperty(
         name="Texture DPI", default=1016.0, min=0.0, soft_min=508.0, soft_max=2032.0
     )
+    black_mask_finish: EnumProperty(
+        name="Black Mask Finish",
+        description="Default surface finish for boards with black solder mask",
+        default="MATTE_BLACK",
+        items=(
+            ("MATTE_BLACK", "Matte Black", "Render black solder mask with matte surface finish"),
+            ("BLACK", "Glossy Black", "Render black solder mask with standard glossy surface finish"),
+        ),
+    )
 
     import_fpnl: BoolProperty(
         name="Import Frontpanel (.fpnl)",
@@ -319,7 +328,12 @@ class PCB2BLENDER_OT_import_pcb3d(ImportHelper, bpy.types.Operator):
             assert (board_material := pcb_object.data.materials[0]) and board_material.node_tree
             self.new_materials.discard(board_material)
             board_material.name = f"PCB_{filepath.stem}"
-            setup_pcb_material(board_material.node_tree, images, pcb.stackup)
+            setup_pcb_material(
+                board_material.node_tree,
+                images,
+                pcb.stackup,
+                black_mask_finish=self.black_mask_finish,
+            )
             if self.import_components and self.add_solder_joints != "NONE":
                 for node_name in ("paste", "seperate_paste", "solder"):
                     board_material.node_tree.nodes[node_name].mute = True

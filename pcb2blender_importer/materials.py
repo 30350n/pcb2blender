@@ -99,13 +99,18 @@ def remove_blender_name_suffix(name: str):
 
 
 def setup_pcb_material(
-    node_tree: bpy.types.ShaderNodeTree, images: dict[str, bpy.types.Image], stackup: Any
+    node_tree: bpy.types.ShaderNodeTree,
+    images: dict[str, bpy.types.Image],
+    stackup: Any,
+    black_mask_finish: str = "MATTE_BLACK",
 ):
     node_tree.nodes.clear()
 
     surface_finish = stackup.surface_finish.name
 
     soldermask = stackup.mask_color.name
+    if soldermask == "BLACK" and black_mask_finish == "MATTE_BLACK":
+        soldermask = "MATTE_BLACK"
     soldermask_inputs = {}
     if soldermask == "CUSTOM":
         color = Vector(srgb2lin(stackup.mask_color_custom))
@@ -582,7 +587,7 @@ class ShaderNodeBsdfPcbSolderMask(SharedCustomNodetreeNodeBase):
                 {},
                 {
                     "Base Color": ("scratches", "Color"),
-                    "Metallic": 0.6,
+                    "Metallic": 0.0,
                     "Subsurface Weight": ("subsurface", 0),
                     "Subsurface Radius": ("ssr", 0),
                     "Roughness": ("scratches", "Roughness"),

@@ -164,6 +164,16 @@ class KiCadColor(Enum):
     BLACK = 5
     WHITE = 6
     YELLOW = 7
+    MATTE_BLACK = 8
+
+    @classmethod
+    def _missing_(cls, value: Any):
+        if isinstance(value, str):
+            norm = value.upper().replace(" ", "_").replace("-", "_")
+            if norm in cls._member_names_:
+                return cls[norm]
+        warning(f"unknown kicad color '{value}'")
+        return cls.GREEN
 
 
 class SurfaceFinish(Enum):
